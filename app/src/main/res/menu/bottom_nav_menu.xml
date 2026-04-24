@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_home"
+        android:icon="@drawable/ic_nav_home_selector"
+        android:title="首页" />
+    <item
+        android:id="@+id/nav_focus_on"
+        android:icon="@drawable/ic_focus_on_selector"
+        android:title="关注" />
+
+    <item
+        android:id="@+id/nav_placeholder"
+        android:enabled="false"
+        android:title="" />
+
+    <item
+        android:id="@+id/nav_shop"
+        android:icon="@drawable/ic_member_purchase_selector"
+        android:title="粉丝" />
+    <item
+        android:id="@+id/nav_mine"
+        android:icon="@drawable/ic_mine_selector"
+        android:title="我的" />
+</menu>

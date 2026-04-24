@@ -1,0 +1,113 @@
+package com.example.bilibili.util
+
+import android.content.Context
+import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+
+object SPUtils {
+    private const val SP_NAME = "secure_bili_prefs"
+    private const val KEY_TOKEN = "webToken"
+    private const val USER_ID = "userId"
+    private const val CURRENT_COIN_COUNT = "currentCoinCount"
+    private const val NICKNAME = "nickname"
+    private const val AVATAR = "avatar"
+
+    private lateinit var prefs: SharedPreferences
+
+    fun init(context: Context) {
+        try {
+            val mainKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+
+            prefs = EncryptedSharedPreferences.create(
+                context,
+                SP_NAME,
+                mainKey, // 传入新的 MasterKey 对象
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (_: Exception) {
+            // 兜底方案
+            prefs = context.getSharedPreferences(SP_NAME, Context.MODE_PRIVATE)
+        }
+    }
+
+    /**
+     * 保存token
+     */
+    fun saveToken(token: String) {
+        prefs.edit().putString(KEY_TOKEN, token).apply()
+    }
+
+    /**
+     * 获取token
+     */
+    fun getToken(): String {
+        return prefs.getString(KEY_TOKEN, "") ?: ""
+    }
+
+    /**
+     * 清理token（一般退出登录使用）
+     */
+    fun cleanToken(token: String) {
+        prefs.edit().remove(KEY_TOKEN)
+    }
+
+    /**
+     * 保存用户ID
+     */
+    fun saveUserId(userId: String) {
+        prefs.edit().putString(USER_ID, userId).apply()
+    }
+
+    /**
+     * 获取用户ID
+     */
+    fun getUserId(): String {
+        return prefs.getString(USER_ID, "") ?: ""
+    }
+
+    /**
+     * 保存当前硬币数量
+     */
+    fun saveCurrentCoinCount(count: Int) {
+        prefs.edit().putInt(CURRENT_COIN_COUNT, count).apply()
+    }
+
+    /**
+     * 获取当前硬币数量
+     */
+    fun getCurrentCoinCount(): Int {
+        return prefs.getInt(CURRENT_COIN_COUNT, 0)
+    }
+
+    /**
+     * 保存昵称
+     */
+    fun saveNickname(nickname: String) {
+        prefs.edit().putString(NICKNAME, nickname).apply()
+    }
+
+    /**
+     * 获取昵称
+     */
+    fun getNickname(): String {
+        return prefs.getString(NICKNAME, "") ?: ""
+    }
+
+    /**
+     * 保存头像
+     */
+    fun saveAvatar(avatar: String) {
+        prefs.edit().putString(AVATAR, avatar).apply()
+    }
+
+    /**
+     * 获取头像
+     */
+    fun getAvatar(): String {
+        return prefs.getString(AVATAR, "") ?: ""
+    }
+}

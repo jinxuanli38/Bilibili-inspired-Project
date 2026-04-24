@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white">
+
+    <ImageView
+        android:id="@+id/iv_banner"
+        android:layout_width="0dp"
+        android:layout_height="160dp"
+        android:scaleType="centerCrop"
+        android:src="@drawable/bg_profile_banner"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/iv_avatar"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_marginStart="16dp"
+        android:padding="2dp"
+        android:src="@drawable/ic_avatar_default"
+
+        android:translationY="20dp"
+        app:layout_constraintBottom_toBottomOf="@+id/iv_banner"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/iv_banner"
+        app:shapeAppearanceOverlay="@style/CircleImage" />
+
+    <LinearLayout
+        android:id="@+id/ll_stats"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingVertical="8dp"
+
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/iv_avatar"
+        app:layout_constraintTop_toBottomOf="@id/iv_banner">
+
+        <LinearLayout style="@style/UserStatItemStyle">
+
+            <TextView
+                android:id="@+id/tv_fans_count"
+                style="@style/UserStatNumberStyle"
+                android:text="209" />
+
+            <TextView
+                style="@style/UserStatLabelStyle"
+                android:text="粉丝" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="14dp"
+            android:background="#EEEEEE" />
+
+        <LinearLayout style="@style/UserStatItemStyle">
+
+            <TextView
+                android:id="@+id/tv_follow_count"
+                style="@style/UserStatNumberStyle"
+                android:text="46" />
+
+            <TextView
+                style="@style/UserStatLabelStyle"
+                android:text="关注" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="14dp"
+            android:background="#EEEEEE" />
+
+        <LinearLayout style="@style/UserStatItemStyle">
+
+            <TextView
+                android:id="@+id/tv_like_count"
+                style="@style/UserStatNumberStyle"
+                android:text="1453" />
+
+            <TextView
+                style="@style/UserStatLabelStyle"
+                android:text="获赞" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tv_nickname"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="50dp"
+        android:text="xixi开了"
+        android:textColor="#212121"
+        android:textSize="20sp"
+
+        android:textStyle="bold"
+
+        app:layout_constraintStart_toStartOf="@+id/iv_avatar"
+        app:layout_constraintTop_toBottomOf="@id/iv_avatar" />
+
+    <TextView
+        android:id="@+id/tv_description"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:text="加我V19503665215，并且关注一下"
+        android:textColor="#757575"
+        android:textSize="13sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@+id/tv_nickname"
+        app:layout_constraintTop_toBottomOf="@id/tv_nickname" />
+
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tab_layout"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="16dp"
+        android:background="@color/white"
+
+        app:layout_constraintTop_toBottomOf="@id/tv_description"
+        app:tabIndicatorColor="#FB7299"
+        app:tabIndicatorFullWidth="false"
+        app:tabIndicatorHeight="2.5dp"
+        app:tabMode="fixed"
+        app:tabRippleColor="@android:color/transparent"
+        app:tabSelectedTextColor="#FB7299"
+        app:tabTextAppearance="@style/MyTabTextStyle"
+        app:tabTextColor="#757575" />
+
+    <View
+        android:id="@+id/tab_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#F4F4F4"
+        app:layout_constraintTop_toBottomOf="@id/tab_layout" />
+
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/view_pager"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tab_divider" />
+
+    <View
+        android:id="@+id/loading_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/white"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="visible"
+
+        tools:visibility="gone" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
