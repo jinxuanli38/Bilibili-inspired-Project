@@ -76,9 +76,9 @@ class ReleaseVideoActivity : AppCompatActivity() {
         }
 
         // 添加分片功能，即可以添加上传更多的视频
-        binding.addShard.setOnClickListener {
-
-        }
+//        binding.addShard.setOnClickListener {
+//
+//        }
 
         // 监听标题的输入
         binding.etTitle.doOnTextChanged { text, _, _, _ ->

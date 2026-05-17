@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+
+    <path
+        android:fillColor="@color/bili_pink"
+        android:pathData="M322.4,107.2v529.4c67.7,24.7 120.3,96 139.7,203.4 8.1,45.7 48.6,76.9 95.3,76.9 52.7,0 95.3,-43.7 95.3,-97.7V668.6h184.5c66.9,0 115.5,-64.5 97.3,-131l-91.4,-338.9c-14.1,-54 -62.8,-91.5 -117.5,-91.5H322.4z" />
+
+    <path
+        android:fillColor="@color/bili_pink"
+        android:pathData="M271.2,107.2H166.1c-44.6,0 -81.1,37.5 -81.1,83.2v351.4c0,45.7 36.5,85.2 81.1,85.2H271.2V107.2z" />
+
+</vector>

@@ -25,15 +25,18 @@ class FrontPagePagingSource(private val pCategoryId: Int = 0) : PagingSource<Int
 
             if (jsonObject.optInt("code") == 200) {
                 val list = mutableListOf<VideoItem>()
-                val dataArray = jsonObject.getJSONObject("data").optJSONArray("list")
+                val dataObject = jsonObject.getJSONObject("data")
+                val dataArray = dataObject.optJSONArray("list")
 
-                if (dataArray != null) {
+                if (dataArray != null && dataArray.length() > 0) {
                     for (i in 0 until dataArray.length()) {
                         val item = dataArray.getJSONObject(i)
                         list.add(VideoItem(
                             videoId = item.optString("videoId"),
                             videoName = item.optString("videoName"),
                             videoCover = item.optString("videoCover"),
+                            userId = item.optString("userId"),
+                            avatar = item.optString("avatar"),
                             playCount = item.optInt("playCount", 0),
                             commentCount = item.optInt("commentCount", 0),
                             duration = item.optInt("duration", 0),
@@ -44,7 +47,7 @@ class FrontPagePagingSource(private val pCategoryId: Int = 0) : PagingSource<Int
                     }
                 }
 
-                // 判断是否还有下一页
+                // 判断是否还有下一页：如果返回的数据量小于请求的大小，说明没有更多数据了
                 val hasMore = list.size >= params.loadSize
                 val nextPage = if (hasMore) page + 1 else null
 
@@ -54,10 +57,11 @@ class FrontPagePagingSource(private val pCategoryId: Int = 0) : PagingSource<Int
                     nextKey = nextPage
                 )
             } else {
-                LoadResult.Error(Exception(jsonObject.optString("message", "加载失败")))
+                val errorMsg = jsonObject.optString("message", "加载失败")
+                LoadResult.Error(Exception("API错误: $errorMsg (code: ${jsonObject.optInt("code")})"))
             }
         } catch (e: Exception) {
-            LoadResult.Error(e)
+            LoadResult.Error(Exception("网络异常: ${e.message}"))
         }
     }
 

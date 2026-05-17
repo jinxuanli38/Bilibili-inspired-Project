@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.bilibili.data.model.VideoItem
 import com.example.bilibili.databinding.ItemVideoCardBinding
 import com.example.bilibili.ui.playVideo.PlayVideoActivity
+import com.example.bilibili.ui.user.UserProfileActivity
 import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.VideoDataUtils.formatDuration
 
@@ -16,6 +17,8 @@ class VideoAdapter :
     PagingDataAdapter<VideoItem, VideoAdapter.VideoViewHolder>(VideoItemDiffCallback()) {
 
     class VideoViewHolder(val binding: ItemVideoCardBinding) : RecyclerView.ViewHolder(binding.root)
+
+    // retry 方法由父类提供，不需要重写
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VideoViewHolder {
         val binding = ItemVideoCardBinding.inflate(
@@ -47,6 +50,21 @@ class VideoAdapter :
 
         // 5. 设置 UP 主名字
         binding.tvUpName.text = item.nickName
+
+        // 点击 UP 主名字跳转到用户主页
+        binding.tvUpName.setOnClickListener { view ->
+            // 阻止事件冒泡到 root，避免触发视频播放跳转
+            view.isClickable = false
+            view.post { view.isClickable = true }
+
+            if (item.userId.isNotEmpty()) {
+                val context = view.context
+                val intent = Intent(context, UserProfileActivity::class.java).apply {
+                    putExtra("user_id", item.userId)
+                }
+                context.startActivity(intent)
+            }
+        }
 
         // 点击时间跳转播放页面
         binding.root.setOnClickListener {

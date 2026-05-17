@@ -12,6 +12,7 @@ import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.example.bilibili.R
 import com.example.bilibili.data.api.PostService
 import com.example.bilibili.databinding.FragmentPersonalBinding
+import com.example.bilibili.ui.edit.EditActivity
 import com.example.bilibili.ui.login.LoginActivity
 import com.example.bilibili.ui.personal.collect.CollectFragment
 import com.example.bilibili.ui.personal.contribute.ContributeFragment
@@ -57,8 +58,10 @@ class PersonalFragment : Fragment() {
                     val data = userInfo.getJSONObject("data")
                     // 更新个人信息
                     binding.apply {
-                        // 加载个人头像
-                        GlideEngine.loadUserAvatar(requireContext(), SPUtils.getAvatar(), ivAvatar)
+                        // 获取并更新头像
+                        val avatar = data.optString("avatar", "")
+                        SPUtils.saveAvatar(avatar) // 更新本地存储的头像
+                        GlideEngine.loadUserAvatar(requireContext(), avatar, ivAvatar)
                         // 粉丝数量
                         tvFansCount.text = data.optInt("fansCount").toString()
                         // 关注数量
@@ -79,21 +82,9 @@ class PersonalFragment : Fragment() {
         }
 
         binding.btnLogout.setOnClickListener {
-            androidx.appcompat.app.AlertDialog.Builder(requireContext(), R.style.PinkDialogTheme)
-                .setTitle("提示")
-                .setMessage("确定要退出登录吗？")
-                .setPositiveButton("确定") { _, _ ->
-                    SPUtils.cleanToken()
-                    ToastUtils.showShort(requireContext(), "已退出登录")
-
-                    val intent = Intent(requireContext(), LoginActivity::class.java)
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    startActivity(intent)
-
-                    requireActivity().finish()
-                }
-                .setNegativeButton("取消", null)
-                .show()
+            // 跳转到编辑资料页面
+            val intent = Intent(requireContext(), EditActivity::class.java)
+            startActivity(intent)
         }
     }
 

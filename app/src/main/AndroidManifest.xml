@@ -23,9 +23,12 @@
         android:theme="@style/Theme.Bilibili"
         android:usesCleartextTraffic="true">
         <activity
-            android:name=".ui.search.SearchActivity"
-            android:theme="@style/Theme.Bilibili.Search"
+            android:name=".ui.edit.EditActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.search.SearchActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Bilibili.Search" />
         <activity
             android:name=".ui.playVideo.PlayVideoActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
@@ -34,6 +37,21 @@
         <activity
             android:name=".ui.releaseVideo.ReleaseVideoActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.user.UserProfileActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.user.EditProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Bilibili" />
+        <activity
+            android:name=".ui.playVideo.comment.CommentReplyActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".ui.playVideo.ImagePreviewActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Bilibili" />
         <activity
             android:name=".MainActivity"
             android:exported="false" />

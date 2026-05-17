@@ -47,6 +47,8 @@ class PlayVideoViewModel : ViewModel() {
 
     // 状态：错误消息
     val errorLive = MutableLiveData<String>()
+    // 文件视频ID
+    val fileIdLive = MutableLiveData<String>()
 
     // 弹幕常见颜色
     val danmuColors = listOf(
@@ -58,6 +60,10 @@ class PlayVideoViewModel : ViewModel() {
     // --- 新增评论相关观察数据 ---
     val commentListLive = MutableLiveData<List<CommentItem>>()
     val isCommentLoading = MutableLiveData<Boolean>()
+    val commentTotalCount = MutableLiveData<Int>()
+
+    // 发布评论的回调
+    val postCommentResult = MutableLiveData<Boolean>()
 
     /**
      * 1. 仿照原 Activity：加载视频详情、作者信息、播放地址
@@ -94,6 +100,7 @@ class PlayVideoViewModel : ViewModel() {
                     val dataArray = JSONObject(pListRes).getJSONArray("data")
                     if (dataArray.length() > 0) {
                         val fileId = dataArray.getJSONObject(0).optString("fileId")
+                        fileIdLive.postValue(fileId)
                         // 拼接 m3u8 地址
                         videoUrlLive.postValue("${RetrofitClient.BASE_URL}file/videoResource/$fileId/index.m3u8")
                         // 解析弹幕信息
@@ -210,11 +217,14 @@ class PlayVideoViewModel : ViewModel() {
                 val allComments = container.commentData.list ?: emptyList()
                 val userActions = container.userActionList ?: emptyList()
 
-                // 3. 将 UserAction 列表转为 Map (Key: commentId, Value: actionType)
+                // 3. 更新评论总数
+                commentTotalCount.postValue(container.commentData.totalCount)
+
+                // 4. 将 UserAction 列表转为 Map (Key: commentId, Value: actionType)
                 // 这样查找效率最高 O(1)
                 val actionMap = userActions.associateBy({ it.commentId }, { it.actionType })
 
-                // 4. 遍历评论列表，把 actionType 状态匹配进去
+                // 5. 遍历评论列表，把 actionType 状态匹配进去
                 allComments.forEach { comment ->
                     matchAndAssignStatus(comment, actionMap)
 
@@ -224,7 +234,7 @@ class PlayVideoViewModel : ViewModel() {
                     }
                 }
 
-                // 5. 最终提交给 UI 观察
+                // 6. 最终提交给 UI 观察
                 commentListLive.postValue(allComments)
 
             } catch (e: Exception) {
@@ -277,6 +287,84 @@ class PlayVideoViewModel : ViewModel() {
             }
         }
         return list
+    }
+
+    /**
+     * 发布评论或回复评论
+     * @param videoId 视频ID
+     * @param content 评论内容
+     * @param replyCommentId 回复的评论ID（null表示发布新评论）
+     */
+    fun postComment(videoId: String, content: String, replyCommentId: Int? = null, imgPath: String? = null) {
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    commentService.postComment(
+                        replyCommentId = replyCommentId,
+                        content = content,
+                        imgPath = imgPath,
+                        videoId = videoId
+                    )
+                }
+
+                val root = JSONObject(result)
+                if (root.optInt("code") == 200) {
+                    postCommentResult.postValue(true)
+                    // 发布成功后重新加载评论列表
+                    fetchComments(videoId)
+                } else {
+                    postCommentResult.postValue(false)
+                    errorLive.postValue(root.optString("msg", "发布失败"))
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                postCommentResult.postValue(false)
+                errorLive.postValue("发布评论失败: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 评论点赞/踩操作
+     * @param videoId 视频ID
+     * @param commentId 评论ID
+     * @param actionType 操作类型：0-点赞，1-踩
+     * @param onSuccess 成功回调，返回新的点赞数
+     */
+    fun doCommentAction(
+        videoId: String,
+        commentId: Int,
+        actionType: Int,
+        onSuccess: (Int, Boolean) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    actionService.doAction(
+                        videoId = videoId,
+                        actionType = actionType,
+                        actionCount = null,
+                        commentId = commentId
+                    )
+                }
+                // 成功后重新加载评论列表，获取最新的点赞数和状态
+                fetchComments(videoId)
+                // 这里应该从新的评论列表中找到对应评论的新点赞数
+                // 为了简化，暂时返回当前值
+                val currentList = commentListLive.value ?: emptyList()
+                val comment = currentList.find { it.commentId == commentId }
+                val newCount = if (actionType == 0) {
+                    comment?.likeCount ?: 0
+                } else {
+                    comment?.hateCount ?: 0
+                }
+                onSuccess(newCount, true)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                errorLive.postValue("操作失败: ${e.message}")
+                onSuccess(0, false)
+            }
+        }
     }
 
 }

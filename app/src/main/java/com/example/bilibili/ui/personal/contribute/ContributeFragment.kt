@@ -44,7 +44,8 @@ class ContributeFragment : Fragment() {
         setupSortClick()
         observeData()
 
-        val userId = SPUtils.getUserId()
+        // 设置用户ID - 优先使用传入的参数，否则使用当前登录用户ID
+        val userId = arguments?.getString("user_id") ?: SPUtils.getUserId()
         viewModel.setParams(userId, currentOrderType)
     }
 

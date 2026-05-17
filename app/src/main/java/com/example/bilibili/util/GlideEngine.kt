@@ -87,12 +87,24 @@ object GlideEngine : ImageEngine {
      */
     fun loadUserAvatar(context: Context, avatarPath: String, imageView: ImageView) {
         if (!isContextValid(context)) return
-        val fullUrl = "${RetrofitClient.BASE_URL}file/getImage?sourceName=$avatarPath"
-        Glide.with(context)
-            .load(fullUrl)
-            .placeholder(R.drawable.ic_bili_placeholder)
-            .circleCrop()
-            .into(imageView)
+
+        if (avatarPath.isEmpty()) {
+            // 如果没有头像路径，直接加载默认头像
+            Glide.with(context)
+                .load(R.drawable.ic_avatar_default)
+                .placeholder(R.drawable.ic_avatar_default)
+                .circleCrop()
+                .into(imageView)
+        } else {
+            // 如果有头像路径，从服务器加载
+            val fullUrl = "${RetrofitClient.BASE_URL}file/getImage?sourceName=$avatarPath"
+            Glide.with(context)
+                .load(fullUrl)
+                .placeholder(R.drawable.ic_avatar_default)
+                .error(R.drawable.ic_avatar_default)
+                .circleCrop()
+                .into(imageView)
+        }
     }
 
     /**
@@ -122,5 +134,12 @@ object GlideEngine : ImageEngine {
     /**
      * 加载预览图
      */
+
+    /**
+     * 创建 GlideEngine 实例，供 PictureSelector 使用
+     */
+    fun createGlideImageEngine(): ImageEngine {
+        return this
+    }
 
 }

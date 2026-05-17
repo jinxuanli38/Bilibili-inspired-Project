@@ -8,7 +8,9 @@ import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    const val BASE_URL = "http://192.168.21.129:7071/"
+//    const val BASE_URL = "http://192.168.21.129:7071/"
+
+    const val BASE_URL = "http://192.168.2.108:7071/"
 
     // Token 拦截器 - 自动添加 token 到请求头
     private val tokenInterceptor = Interceptor { chain ->

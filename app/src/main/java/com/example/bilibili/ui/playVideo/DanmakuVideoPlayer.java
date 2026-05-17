@@ -61,6 +61,8 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
 
     private File mDumakuFile;
 
+    private DanmakuTimer mDanmakuTimer; // 保存弹幕定时器
+
     public DanmakuVideoPlayer(Context context, Boolean fullFlag) {
         super(context, fullFlag);
     }
@@ -249,6 +251,8 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
             mDanmakuView.setCallback(new master.flame.danmaku.controller.DrawHandler.Callback() {
                 @Override
                 public void updateTimer(DanmakuTimer timer) {
+                    // 保存弹幕定时器
+                    mDanmakuTimer = timer;
                 }
 
                 @Override
@@ -442,6 +446,13 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
         } catch (Exception e) {
             danmaku.textColor = Color.WHITE; // 解析失败默认白色
         }
+
+        // 🔧 关键修复：设置缺失的属性
+        if (mDanmakuTimer != null) {
+            danmaku.setTimer(mDanmakuTimer); // 设置定时器
+
+        }
+        danmaku.flags = mDanmakuContext.mGlobalFlagValues; // 设置全局标志
 
         // 5. 投喂给引擎
         mDanmakuView.addDanmaku(danmaku);

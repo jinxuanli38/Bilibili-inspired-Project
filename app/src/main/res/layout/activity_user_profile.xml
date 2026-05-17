@@ -6,6 +6,18 @@
     android:layout_height="match_parent"
     android:background="@color/white">
 
+    <!-- 返回按钮 -->
+    <ImageView
+        android:id="@+id/iv_back"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:padding="8dp"
+        android:src="@drawable/ic_back_arrow"
+        app:tint="#FFFFFF"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        android:translationZ="1dp"/>
+
     <ImageView
         android:id="@+id/iv_banner"
         android:layout_width="0dp"
@@ -23,7 +35,6 @@
         android:layout_marginStart="16dp"
         android:padding="2dp"
         android:src="@drawable/ic_avatar_default"
-
         android:translationY="20dp"
         app:layout_constraintBottom_toBottomOf="@+id/iv_banner"
         app:layout_constraintStart_toStartOf="parent"
@@ -37,7 +48,6 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingVertical="8dp"
-
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@id/iv_avatar"
         app:layout_constraintTop_toBottomOf="@id/iv_banner">
@@ -47,7 +57,7 @@
             <TextView
                 android:id="@+id/tv_fans_count"
                 style="@style/UserStatNumberStyle"
-                android:text="209" />
+                android:text="0" />
 
             <TextView
                 style="@style/UserStatLabelStyle"
@@ -64,7 +74,7 @@
             <TextView
                 android:id="@+id/tv_follow_count"
                 style="@style/UserStatNumberStyle"
-                android:text="46" />
+                android:text="0" />
 
             <TextView
                 style="@style/UserStatLabelStyle"
@@ -81,7 +91,7 @@
             <TextView
                 android:id="@+id/tv_like_count"
                 style="@style/UserStatNumberStyle"
-                android:text="1453" />
+                android:text="0" />
 
             <TextView
                 style="@style/UserStatLabelStyle"
@@ -90,7 +100,7 @@
     </LinearLayout>
 
     <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/btn_logout"
+        android:id="@+id/btn_focus"
         android:layout_width="0dp"
         android:layout_height="32dp"
         android:layout_marginTop="12dp"
@@ -98,7 +108,7 @@
         android:background="@drawable/bg_pink_border"
         android:gravity="center"
         android:padding="0dp"
-        android:text="编辑资料"
+        android:text="关注"
         android:textColor="#FB7299"
         android:textSize="13sp"
         app:layout_constraintEnd_toEndOf="parent"
@@ -110,14 +120,12 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
-        android:text="xixi开了"
+        android:text="加载中..."
         android:textColor="#212121"
         android:textSize="20sp"
-
         android:textStyle="bold"
-
         app:layout_constraintStart_toStartOf="@+id/iv_avatar"
-        app:layout_constraintTop_toBottomOf="@id/btn_logout" />
+        app:layout_constraintTop_toBottomOf="@id/btn_focus" />
 
     <TextView
         android:id="@+id/tv_description"
@@ -127,7 +135,7 @@
         android:layout_marginEnd="16dp"
         android:ellipsize="end"
         android:maxLines="2"
-        android:text="加我V19503665215，并且关注一下"
+        android:text="加载中..."
         android:textColor="#757575"
         android:textSize="13sp"
         app:layout_constraintEnd_toEndOf="parent"
@@ -140,7 +148,6 @@
         android:layout_height="48dp"
         android:layout_marginTop="16dp"
         android:background="@color/white"
-
         app:layout_constraintTop_toBottomOf="@id/tv_description"
         app:tabIndicatorColor="#FB7299"
         app:tabIndicatorFullWidth="false"
@@ -173,7 +180,6 @@
         android:clickable="true"
         android:focusable="true"
         android:visibility="visible"
-
         tools:visibility="gone" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
