@@ -7,10 +7,10 @@ import androidx.fragment.app.Fragment
 import android.view.View
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.fragment.app.viewModels
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
-import androidx.paging.LoadState
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.example.bilibili.data.api.CategoryInfoService
 import com.example.bilibili.data.api.VideoService
 import com.example.bilibili.data.model.CategoryItem
@@ -20,8 +20,8 @@ import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.SPUtils
 import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -31,16 +31,12 @@ class FrontPageFragment : Fragment() {
     private var _binding: FragmentFrontPageBinding? = null
     private val binding get() = _binding!!
 
-    private val viewModel: FrontPageViewModel by viewModels()
-    private lateinit var videoAdapter: VideoAdapter
-
     private var hotWordsArray: Array<String> = arrayOf()
-
     private val categoryService = RetrofitClient.create(CategoryInfoService::class.java)
-
     private val videoService = RetrofitClient.create(VideoService::class.java)
 
-    private var dataCollectionJob: Job? = null
+    // 存储分类列表
+    private val categoryList = mutableListOf<CategoryItem>()
 
     override fun onCreateView(
         inflater: android.view.LayoutInflater,
@@ -63,7 +59,7 @@ class FrontPageFragment : Fragment() {
             binding.appBarLayout.setPadding(0, statusBarHeight, 0, 0)
 
             // 2. 既然最外层已经加了 Padding，内部的 top 和 tabContainer 就不需要单独加顶部 Padding 了
-            // 这样就解决了你说的“双重 Padding”导致高度变厚的问题
+            // 这样就解决了你说的"双重 Padding"导致高度变厚的问题
             binding.top.setPadding(binding.top.paddingLeft, 0, binding.top.paddingRight, 0)
             binding.container.setPadding(0, 0, 0, 0)
 
@@ -79,19 +75,6 @@ class FrontPageFragment : Fragment() {
         // 动画监听
         initScrollAnimation()
 
-        // 1. 初始化 RecyclerView 和 Adapter
-        videoAdapter = VideoAdapter()
-        binding.recyclerView.apply {
-            layoutManager = GridLayoutManager(requireContext(), 2)
-            adapter = videoAdapter
-        }
-
-        // 2. 设置下拉刷新
-        binding.swipeRefreshLayout.setColorSchemeColors(android.graphics.Color.parseColor("#FB7299"))
-        binding.swipeRefreshLayout.setOnRefreshListener {
-            videoAdapter.refresh()
-        }
-
         // 监听搜索框
         binding.llSearchBar.setOnClickListener {
             val intent = Intent(requireContext(), SearchActivity::class.java)
@@ -99,19 +82,40 @@ class FrontPageFragment : Fragment() {
             startActivity(intent)
         }
 
-        // 3. 监听分页数据流
-        collectVideoList()
-
-        // 任务 1：监听加载状态 (它会一直运行)
-        viewLifecycleOwner.lifecycleScope.launch {
-            videoAdapter.loadStateFlow.collect { loadState ->
-                binding.swipeRefreshLayout.isRefreshing = loadState.refresh is LoadState.Loading
-                val isEmpty = videoAdapter.itemCount == 0 && loadState.refresh !is LoadState.Loading
-                binding.llEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
-                binding.recyclerView.visibility = if (isEmpty) View.GONE else View.VISIBLE
-            }
+        // 用户头像点击，跳转到编辑资料
+        binding.ivAvatar.setOnClickListener {
+            val intent = Intent(requireContext(), com.example.bilibili.ui.user.EditProfileActivity::class.java)
+            startActivity(intent)
         }
 
+        // 加载热门搜索词
+        loadHotWords()
+
+        // 加载分类并初始化 ViewPager2
+        loadTabsAndInitViewPager()
+    }
+
+    private fun initScrollAnimation() {
+        binding.appBarLayout.addOnOffsetChangedListener { appBarLayout, verticalOffset ->
+            val totalRange = appBarLayout.totalScrollRange
+            val fraction = abs(verticalOffset).toFloat() / totalRange
+
+            // 这种计算方式会让搜索栏在滑到一半时就几乎看不见了，
+            // 给人一种"在刘海前隐去"的视觉错觉，而不是"钻进刘海"
+            binding.top.alpha = (1f - fraction * 1.2f).coerceAtLeast(0f)
+
+            // 同时处理右侧小搜索图标
+            if (fraction > 0.7f) {
+                binding.ivSmallSearch.alpha = (fraction - 0.7f) * 3.3f
+                binding.ivSmallSearch.visibility = View.VISIBLE
+            } else {
+                binding.ivSmallSearch.alpha = 0f
+                binding.ivSmallSearch.visibility = View.GONE
+            }
+        }
+    }
+
+    private fun loadHotWords() {
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val hotWordTop = videoService.getHotWordTop()
@@ -130,75 +134,25 @@ class FrontPageFragment : Fragment() {
                 e.printStackTrace()
             }
         }
-
-        // 加载分类
-        loadTabs()
     }
 
-    private fun initScrollAnimation() {
-        binding.appBarLayout.addOnOffsetChangedListener { appBarLayout, verticalOffset ->
-            val totalRange = appBarLayout.totalScrollRange
-            val fraction = abs(verticalOffset).toFloat() / totalRange
-
-            // 这种计算方式会让搜索栏在滑到一半时就几乎看不见了，
-            // 给人一种“在刘海前隐去”的视觉错觉，而不是“钻进刘海”
-            binding.top.alpha = (1f - fraction * 1.2f).coerceAtLeast(0f)
-
-            // 同时处理右侧小搜索图标
-            if (fraction > 0.7f) {
-                binding.ivSmallSearch.alpha = (fraction - 0.7f) * 3.3f
-                binding.ivSmallSearch.visibility = View.VISIBLE
-            } else {
-                binding.ivSmallSearch.alpha = 0f
-                binding.ivSmallSearch.visibility = View.GONE
-            }
-        }
-    }
-
-    private fun loadTabs() {
+    private fun loadTabsAndInitViewPager() {
         lifecycleScope.launch(Dispatchers.Main) {
             try {
-                // 1. 首先添加"全部"tab（不选中）
-                val allTab = binding.tabLayout.newTab().apply {
-                    text = "全部"
-                    tag = -1 // 使用-1表示全部
-                }
-                binding.tabLayout.addTab(allTab)
-
                 // 加载个人头像
                 GlideEngine.loadUserAvatar(requireContext(), SPUtils.getAvatar(), binding.ivAvatar)
 
-                // 2. 加载分类列表
+                // 加载分类列表
                 val response = withContext(Dispatchers.IO) { categoryService.loadAllCategoryInfo() }
                 val categories = parseCategoryJson(response)
 
-                // 3. 添加其他分类tab
-                categories.forEach { category ->
-                    val tab = binding.tabLayout.newTab().apply {
-                        text = category.categoryName
-                        tag = category.categoryId
-                    }
-                    binding.tabLayout.addTab(tab)
-                }
+                // 添加"全部"分类
+                categoryList.clear()
+                categoryList.add(CategoryItem(-1, "全部"))
+                categoryList.addAll(categories)
 
-                // 4. 设置tab选择监听
-                binding.tabLayout.addOnTabSelectedListener(object :
-                    TabLayout.OnTabSelectedListener {
-                    override fun onTabSelected(tab: TabLayout.Tab?) {
-                        val categoryId = tab?.tag as? Int ?: -1
-                        viewModel.switchCategory(categoryId)
-                        // 重新收集数据流
-                        collectVideoList()
-                    }
-
-                    override fun onTabUnselected(tab: TabLayout.Tab?) {}
-                    override fun onTabReselected(tab: TabLayout.Tab?) {
-                        videoAdapter.refresh() // 重新点击时刷新
-                    }
-                })
-
-                // 5. 手动选中第一个tab（全部）
-                binding.tabLayout.selectTab(binding.tabLayout.getTabAt(0))
+                // 初始化 ViewPager2
+                initViewPager()
 
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -206,14 +160,31 @@ class FrontPageFragment : Fragment() {
         }
     }
 
-    private fun collectVideoList() {
-        // 取消之前的数据收集
-        dataCollectionJob?.cancel()
-        // 启动新的数据收集
-        dataCollectionJob = viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.videoList.collect { pagingData ->
-                videoAdapter.submitData(pagingData)
-            }
+    private fun initViewPager() {
+        // 设置 ViewPager2 适配器
+        val viewPagerAdapter = CategoryPagerAdapter(this, categoryList)
+        binding.viewPager.adapter = viewPagerAdapter
+
+        // 绑定 TabLayout 和 ViewPager2
+        TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
+            tab.text = categoryList[position].categoryName
+        }.attach()
+
+        // 设置 TabLayout 的模式为可滚动
+        binding.tabLayout.tabMode = TabLayout.MODE_SCROLLABLE
+
+        // 设置用户可见页面的缓存数量（优化性能）
+        binding.viewPager.offscreenPageLimit = 2
+    }
+
+    // ViewPager2 适配器
+    class CategoryPagerAdapter(fragment: Fragment, private val categories: List<CategoryItem>) :
+        FragmentStateAdapter(fragment) {
+
+        override fun getItemCount(): Int = categories.size
+
+        override fun createFragment(position: Int): Fragment {
+            return CategoryVideoFragment.newInstance(categories[position].categoryId)
         }
     }
 
@@ -235,7 +206,6 @@ class FrontPageFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        dataCollectionJob?.cancel()
         _binding = null
     }
 }

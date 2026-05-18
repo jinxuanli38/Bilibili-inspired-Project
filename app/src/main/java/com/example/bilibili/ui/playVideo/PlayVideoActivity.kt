@@ -1,7 +1,6 @@
 package com.example.bilibili.ui.playVideo
 
 import android.content.res.Configuration
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -10,6 +9,8 @@ import android.view.inputmethod.InputMethodManager
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.viewpager2.adapter.FragmentStateAdapter
@@ -22,9 +23,9 @@ import com.example.bilibili.ui.playVideo.danmu.DanmuColorAdapter
 import com.example.bilibili.ui.playVideo.intro.VideoIntroFragment
 import com.example.bilibili.util.ToastUtils
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import com.shuyu.gsyvideoplayer.utils.OrientationUtils
-import kotlin.math.abs
 
 class PlayVideoActivity : AppCompatActivity() {
 
@@ -49,7 +50,6 @@ class PlayVideoActivity : AppCompatActivity() {
         // 2. 初始化各组件
         initSystemUI()
         initViewPager()
-        initScrollEffect()
 
         // 3. 注册数据观察者 (在请求数据前先订阅)
         initObservers()
@@ -171,13 +171,14 @@ class PlayVideoActivity : AppCompatActivity() {
             }
         }
 
-        // 观察视频详情：同步更新 Activity 顶部悬浮栏的标题
+        // 观察视频详情
         viewModel.videoDetailLive.observe(this) { videoInfo ->
-            val videoName = videoInfo.optString("videoName")
             currentVideoId = videoInfo.optString("videoId")
-            currentFileId = videoInfo.optString("fileId")
+        }
 
-            binding.tvStickyTitle.text = "继续播放：$videoName"
+        // 观察文件ID
+        viewModel.fileIdLive.observe(this) { fileId ->
+            currentFileId = fileId
         }
 
         // 观察错误信息
@@ -205,7 +206,12 @@ class PlayVideoActivity : AppCompatActivity() {
             window.attributes = lp
         }
 
-        // todo刘海屏适配
+        // 刘海屏/水滴屏适配：给播放器容器添加状态栏高度的 padding
+        ViewCompat.setOnApplyWindowInsetsListener(binding.playerContainer) { _, insets ->
+            val statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            binding.playerContainer.setPadding(0, statusBarHeight, 0, 0)
+            insets
+        }
     }
 
     /**
@@ -221,31 +227,36 @@ class PlayVideoActivity : AppCompatActivity() {
 
         // 绑定 TabLayout 与 ViewPager2
         TabLayoutMediator(binding.videoTabLayout, binding.viewPager) { tab, position ->
-            tab.text = if (position == 0) "简介" else "评论"
-        }.attach()
-    }
-
-    /**
-     * 处理上滑时的顶栏粉色渐变效果
-     */
-    private fun initScrollEffect() {
-        binding.appBarLayout.addOnOffsetChangedListener { appBarLayout, verticalOffset ->
-            val totalScrollRange = appBarLayout.totalScrollRange
-            if (totalScrollRange == 0) return@addOnOffsetChangedListener
-
-            val percentage = abs(verticalOffset).toFloat() / totalScrollRange.toFloat()
-
-            // 1. 背景渐变：从透明到 B站粉 (#FB7299)
-            val alpha = (percentage * 255).toInt()
-            binding.stickyToolbar.setBackgroundColor(Color.argb(alpha, 251, 114, 153))
-
-            // 2. 标题显隐：滑动到 80% 后开始文字渐现
-            if (percentage > 0.8f) {
-                binding.tvStickyTitle.alpha = (percentage - 0.8f) / 0.2f
+            if (position == 0) {
+                tab.text = "简介"
             } else {
-                binding.tvStickyTitle.alpha = 0f
+                // 观察评论总数变化
+                viewModel.commentTotalCount.observe(this@PlayVideoActivity) { totalCount ->
+                    if (tab.text.toString().startsWith("评论")) {
+                        tab.text = "评论 $totalCount"
+                    }
+                }
+                // 初始设置
+                val currentCount = viewModel.commentTotalCount.value ?: 0
+                tab.text = "评论 $currentCount"
             }
-        }
+        }.attach()
+
+        // 监听 Tab 切换事件
+        binding.videoTabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {
+                if (tab?.position == 1) {
+                    // 切换到评论Tab时，让底部栏立即可见
+                    binding.viewPager.postDelayed({
+                        binding.viewPager.requestLayout()
+                    }, 100)
+                }
+            }
+
+            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+
+            override fun onTabReselected(tab: TabLayout.Tab?) {}
+        })
     }
 
     /**

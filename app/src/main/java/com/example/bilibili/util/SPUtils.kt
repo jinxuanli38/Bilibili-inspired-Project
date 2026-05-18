@@ -12,6 +12,11 @@ object SPUtils {
     private const val CURRENT_COIN_COUNT = "currentCoinCount"
     private const val NICKNAME = "nickname"
     private const val AVATAR = "avatar"
+    private const val SEX = "sex"
+    private const val BIRTHDAY = "birthday"
+    private const val SCHOOL = "school"
+    private const val PERSONAL_INTRODUCTION = "personalIntroduction"
+    private const val NOTICE_INFO = "noticeInfo"
     private const val KEY_SEARCH_HISTORY = "search_history_json"
 
     private lateinit var prefs: SharedPreferences
@@ -159,6 +164,76 @@ object SPUtils {
      */
     fun clearSearchHistory() {
         prefs.edit().remove(KEY_SEARCH_HISTORY).apply()
+    }
+
+    /**
+     * 保存性别
+     */
+    fun saveSex(sex: Int) {
+        prefs.edit().putInt(SEX, sex).apply()
+    }
+
+    /**
+     * 获取性别
+     */
+    fun getSex(): Int {
+        return prefs.getInt(SEX, 0)
+    }
+
+    /**
+     * 保存生日
+     */
+    fun saveBirthday(birthday: String) {
+        prefs.edit().putString(BIRTHDAY, birthday).apply()
+    }
+
+    /**
+     * 获取生日
+     */
+    fun getBirthday(): String {
+        return prefs.getString(BIRTHDAY, "") ?: ""
+    }
+
+    /**
+     * 保存学校
+     */
+    fun saveSchool(school: String) {
+        prefs.edit().putString(SCHOOL, school).apply()
+    }
+
+    /**
+     * 获取学校
+     */
+    fun getSchool(): String {
+        return prefs.getString(SCHOOL, "") ?: ""
+    }
+
+    /**
+     * 保存个人简介
+     */
+    fun savePersonalIntroduction(introduction: String) {
+        prefs.edit().putString(PERSONAL_INTRODUCTION, introduction).apply()
+    }
+
+    /**
+     * 获取个人简介
+     */
+    fun getPersonalIntroduction(): String {
+        return prefs.getString(PERSONAL_INTRODUCTION, "") ?: ""
+    }
+
+    /**
+     * 保存通知信息
+     */
+    fun saveNoticeInfo(noticeInfo: String) {
+        prefs.edit().putString(NOTICE_INFO, noticeInfo).apply()
+    }
+
+    /**
+     * 获取通知信息
+     */
+    fun getNoticeInfo(): String {
+        return prefs.getString(NOTICE_INFO, "") ?: ""
     }
 
 }

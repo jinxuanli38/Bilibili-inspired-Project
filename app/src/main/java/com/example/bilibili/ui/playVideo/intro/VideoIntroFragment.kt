@@ -1,6 +1,7 @@
 package com.example.bilibili.ui.playVideo.intro
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -13,6 +14,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.bilibili.R
 import com.example.bilibili.databinding.FragmentVideoIntroBinding
 import com.example.bilibili.ui.playVideo.PlayVideoViewModel
+import com.example.bilibili.ui.user.UserProfileActivity
 import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.SPUtils
 import org.json.JSONArray
@@ -97,6 +99,16 @@ class VideoIntroFragment : Fragment() {
             tvAuthorName.text = user.optString("nickName")
             tvAuthorStats.text = "${user.optString("fansCount")}粉丝"
             GlideEngine.loadVideoCover(requireContext(), user.optString("avatar"), ivAvatar)
+
+            // 点击头像跳转到 UP 主主页
+            ivAvatar.setOnClickListener {
+                if (authorId.isNotEmpty()) {
+                    val intent = Intent(requireContext(), UserProfileActivity::class.java).apply {
+                        putExtra("user_id", authorId)
+                    }
+                    startActivity(intent)
+                }
+            }
 
             // 如果是当前用户的视频则没有关注按钮
             if (SPUtils.getUserId() == authorId) {

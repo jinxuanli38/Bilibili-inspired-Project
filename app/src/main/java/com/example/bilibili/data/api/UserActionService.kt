@@ -19,6 +19,7 @@ interface UserActionService {
     suspend fun doAction(
         @Field("videoId") videoId: String,
         @Field("actionType") actionType: Int,
-        @Field("actionCount") actionCount: Int? = null
+        @Field("actionCount") actionCount: Int? = null,
+        @Field("commentId") commentId: Int? = null
     ): String
 }

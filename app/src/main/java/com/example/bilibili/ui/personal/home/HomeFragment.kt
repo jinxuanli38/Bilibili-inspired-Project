@@ -44,8 +44,8 @@ class HomeFragment : Fragment() {
 
         binding.rvHomeVideo.adapter = videoAdapter
 
-        // 设置用户ID
-        val userId = SPUtils.getUserId()
+        // 设置用户ID - 优先使用传入的参数，否则使用当前登录用户ID
+        val userId = arguments?.getString("user_id") ?: SPUtils.getUserId()
         viewModel.setUserId(userId)
 
         // 设置下拉刷新

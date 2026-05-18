@@ -127,9 +127,12 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
                 android:ellipsize="end"
                 android:singleLine="true"
-                android:textColor="#999999"
+                android:textColor="#757575"
                 android:textSize="11sp"
                 tools:text="何日藕、几时莲" />
 

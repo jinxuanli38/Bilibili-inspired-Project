@@ -29,6 +29,7 @@
             android:layout_weight="1"
             android:background="@drawable/bg_gray_input_field"
             android:hint="发个友善的弹幕见证当下"
+            android:maxLines="1"
             android:paddingHorizontal="16dp"
             android:textColorHint="#9499A0"
             android:textSize="14sp" />

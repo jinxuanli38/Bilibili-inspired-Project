@@ -30,16 +30,16 @@
             android:textColor="#333333"
             android:textSize="18sp" />
 
-        <TextView
-            android:id="@+id/add_shard"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
-            android:layout_marginEnd="16dp"
-            android:text="+ 添加分P"
-            android:textColor="#666666"
-            android:textSize="14sp" />
+<!--        <TextView-->
+<!--            android:id="@+id/add_shard"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_alignParentEnd="true"-->
+<!--            android:layout_centerVertical="true"-->
+<!--            android:layout_marginEnd="16dp"-->
+<!--            android:text="+ 添加分P"-->
+<!--            android:textColor="#666666"-->
+<!--            android:textSize="14sp" />-->
     </RelativeLayout>
 
     <androidx.core.widget.NestedScrollView

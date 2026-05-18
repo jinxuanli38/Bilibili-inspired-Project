@@ -73,4 +73,16 @@ interface PostService {
         @Field("focusUserId") focusUserId: String
     ): String
 
+    // 更新用户信息
+    @POST("ucenter/home/updateUserInfo")
+    @FormUrlEncoded
+    suspend fun updateUserInfo(
+        @Field("avatar") avatar: String,
+        @Field("nickName") nickName: String,
+        @Field("sex") sex: Int,
+        @Field("birthday") birthday: String,
+        @Field("school") school: String,
+        @Field("noticeInfo") noticeInfo: String,
+        @Field("personalIntroduction") personalIntroduction: String
+    ): String
 }

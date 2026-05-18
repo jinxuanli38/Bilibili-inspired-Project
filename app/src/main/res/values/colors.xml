@@ -11,7 +11,10 @@
     <color name="grey">#757575</color>
     <color name="shallow_grey">#F5F5F5</color>
     <color name="bili_pink">#FB7299</color>
+    <color name="bilibili_pink">#FB7299</color>
     <color name="bili_text_grey">#999999</color>
     <color name="bili_divider">#F4F4F4</color>
     <color name="gray">#757575</color>
+    <color name="sl_comment_item_color_default">#9499A0</color>
+    <color name="sl_divider_color">#F4F4F4</color>
 </resources>

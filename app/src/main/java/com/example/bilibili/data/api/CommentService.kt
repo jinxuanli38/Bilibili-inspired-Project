@@ -18,8 +18,9 @@ interface CommentService {
     @POST("comment/postComment")
     @FormUrlEncoded
     suspend fun postComment(
+        @Field("replyCommentId") replyCommentId: Int? = null,
         @Field("content") content: String,
-        @Field("imgPath") imgPath: Int? = null,
+        @Field("imgPath") imgPath: String? = null,
         @Field("videoId") videoId: String,
     ): String
 }

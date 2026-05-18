@@ -45,7 +45,7 @@
                 android:orientation="horizontal"
                 android:paddingStart="12dp"
                 app:layout_constraintBottom_toBottomOf="@id/iv_avatar"
-                app:layout_constraintEnd_toStartOf="@+id/fl_message"
+                app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toEndOf="@id/iv_avatar"
                 app:layout_constraintTop_toTopOf="@id/iv_avatar">
 
@@ -64,32 +64,6 @@
                     android:textColor="#999999"
                     android:textSize="13sp" />
             </LinearLayout>
-
-            <FrameLayout
-                android:id="@+id/fl_message"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                app:layout_constraintBottom_toBottomOf="@id/iv_avatar"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="@id/iv_avatar">
-
-                <ImageView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_gravity="center"
-                    android:src="@drawable/ic_message"
-                    app:tint="#666666" />
-
-                <TextView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:layout_gravity="top|end"
-                    android:background="@drawable/bg_red_dot"
-                    android:gravity="center"
-                    android:text="9"
-                    android:textColor="@color/white"
-                    android:textSize="8sp" />
-            </FrameLayout>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -130,49 +104,10 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipeRefreshLayout"
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/viewPager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recyclerView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:clipToPadding="false"
-                android:padding="4dp"
-                app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-                app:spanCount="2"
-                tools:listitem="@layout/item_video_card" />
-
-            <LinearLayout
-                android:id="@+id/llEmpty"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <ImageView
-                    android:layout_width="160dp"
-                    android:layout_height="160dp"
-                    android:src="@drawable/img_empty" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="这里什么都没有源~"
-                    android:textColor="#999999"
-                    android:textSize="14sp" />
-            </LinearLayout>
-        </FrameLayout>
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
