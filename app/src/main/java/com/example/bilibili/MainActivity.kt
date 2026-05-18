@@ -148,4 +148,22 @@ class MainActivity : AppCompatActivity() {
         transaction.add(R.id.nav_host_fragment, fragment, tag)
         transaction.commit()
     }
+
+    fun switchToPersonalTab() {
+        binding.bottomNavView.selectedItemId = R.id.nav_mine
+        switchFragment(TAG_MINE)
+    }
+
+    fun switchToContributeTab() {
+        binding.bottomNavView.selectedItemId = R.id.nav_mine
+        switchFragment(TAG_MINE)
+
+        // 立即切换到投稿tab，无需延迟
+        binding.root.post {
+            val fragment = supportFragmentManager.findFragmentByTag(TAG_MINE)
+            if (fragment is PersonalFragment) {
+                fragment.switchToContributeTab()
+            }
+        }
+    }
 }

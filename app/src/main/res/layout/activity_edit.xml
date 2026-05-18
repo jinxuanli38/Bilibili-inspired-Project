@@ -30,11 +30,23 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="账号资料"
+            android:text="编辑资料"
             android:textColor="#333333"
             android:textSize="18sp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toEndOf="@id/ivBack"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/tvSave"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="16dp"
+            android:text="保存"
+            android:textColor="#FB7299"
+            android:textSize="16sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -53,9 +65,13 @@
 
         <!-- 2. 头像栏 -->
         <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/clAvatar"
             android:layout_width="match_parent"
             android:layout_height="88dp"
-            android:paddingHorizontal="16dp">
+            android:paddingHorizontal="16dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -98,9 +114,13 @@
 
         <!-- 3. 昵称 -->
         <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/clNickname"
             android:layout_width="match_parent"
             android:layout_height="54dp"
-            android:paddingHorizontal="16dp">
+            android:paddingHorizontal="16dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:id="@+id/tvNicknameLabel"
@@ -144,9 +164,13 @@
 
         <!-- 4. 性别 -->
         <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/clGender"
             android:layout_width="match_parent"
             android:layout_height="54dp"
-            android:paddingHorizontal="16dp">
+            android:paddingHorizontal="16dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:id="@+id/tvGenderLabel"
@@ -190,9 +214,13 @@
 
         <!-- 5. 出生日期 -->
         <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/clBirthday"
             android:layout_width="match_parent"
             android:layout_height="54dp"
-            android:paddingHorizontal="16dp">
+            android:paddingHorizontal="16dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:id="@+id/tvBirthdayLabel"
@@ -236,10 +264,14 @@
 
         <!-- 6. 个性签名 -->
         <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/clSignature"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:minHeight="54dp"
-            android:paddingHorizontal="16dp">
+            android:paddingHorizontal="16dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:id="@+id/tvSignLabel"
@@ -286,9 +318,13 @@
 
         <!-- 7. 学校 -->
         <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/clSchool"
             android:layout_width="match_parent"
             android:layout_height="54dp"
-            android:paddingHorizontal="16dp">
+            android:paddingHorizontal="16dp"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:id="@+id/tvSchoolLabel"
@@ -340,10 +376,14 @@
 
     <!-- 9. UID 行 -->
     <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/clUid"
         android:layout_width="match_parent"
         android:layout_height="54dp"
         android:background="@android:color/white"
-        android:paddingHorizontal="16dp">
+        android:paddingHorizontal="16dp"
+        android:foreground="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
 
         <TextView
             android:id="@+id/tvUidLabel"

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_bottom_sheet"
+    android:padding="16dp">
+
+    <RadioGroup
+        android:id="@+id/radioGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <RadioButton
+            android:id="@+id/rbMale"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="男"
+            android:textColor="#333333"
+            android:textSize="16sp"
+            android:buttonTint="#FB7299"
+            android:paddingStart="8dp"
+            android:gravity="center_vertical" />
+
+        <RadioButton
+            android:id="@+id/rbFemale"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="女"
+            android:textColor="#333333"
+            android:textSize="16sp"
+            android:buttonTint="#FB7299"
+            android:paddingStart="8dp"
+            android:gravity="center_vertical" />
+
+        <RadioButton
+            android:id="@+id/rbSecret"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="保密"
+            android:textColor="#333333"
+            android:textSize="16sp"
+            android:buttonTint="#FB7299"
+            android:paddingStart="8dp"
+            android:gravity="center_vertical" />
+    </RadioGroup>
+</LinearLayout>

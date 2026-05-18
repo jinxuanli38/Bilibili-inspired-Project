@@ -41,4 +41,12 @@ interface VideoService {
         @Field("orderType") orderType: Int? = null
     ): String
 
+    // 获取推荐视频
+    @POST("video/getVideoRecommend")
+    @FormUrlEncoded
+    suspend fun getVideoRecommend(
+        @Field("keyWord") keyword: String,
+        @Field("videoId") videoId: String
+    ): String
+
 }

@@ -1,13 +1,16 @@
 package com.example.bilibili.ui.personal
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.fragment.app.FragmentActivity
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.example.bilibili.R
 import com.example.bilibili.data.api.PostService
@@ -20,7 +23,6 @@ import com.example.bilibili.ui.personal.home.HomeFragment
 import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.SPUtils
-import com.example.bilibili.util.ToastUtils
 import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,7 +36,8 @@ class PersonalFragment : Fragment() {
     private val tabTitles = listOf("主页", "投稿", "收藏")
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
+        inflater: LayoutInflater,
+        container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentPersonalBinding.inflate(inflater, container, false)
@@ -43,6 +46,9 @@ class PersonalFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // 添加状态栏适配
+        setupStatusBarPadding()
 
         setupViewPagerAndTabs()
 
@@ -86,11 +92,66 @@ class PersonalFragment : Fragment() {
             val intent = Intent(requireContext(), EditActivity::class.java)
             startActivity(intent)
         }
+
+        // 设置退出登录按钮
+        setupLogoutButton()
+    } // 🔥 修复点1：在这里加上右大括号，正确结束 onViewCreated 方法
+
+    private fun setupStatusBarPadding() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+
+            // 只给顶部banner添加状态栏padding
+            val params = binding.ivBanner.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+            params.topMargin = statusBarHeight
+            binding.ivBanner.layoutParams = params
+
+            insets
+        }
+    }
+
+    private fun setupLogoutButton() {
+        // 检查是否是当前用户
+        val currentUserId = SPUtils.getUserId()
+        val isCurrentUser = (currentUserId.isNotEmpty() && currentUserId == "self")
+
+        if (isCurrentUser) {
+            // 显示退出登录按钮
+            binding.ivLogout.visibility = View.VISIBLE
+            binding.ivLogout.setOnClickListener {
+                showLogoutDialog()
+            }
+        } else {
+            // 隐藏退出登录按钮
+            binding.ivLogout.visibility = View.GONE
+        }
+    }
+
+    private fun showLogoutDialog() {
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("退出登录")
+            .setMessage("确定要退出登录吗？")
+            .setPositiveButton("确定") { _, _ ->
+                // 退出登录逻辑
+                SPUtils.cleanToken()
+                val intent = Intent(requireContext(), LoginActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+                requireActivity().finish()
+            }
+            .setNegativeButton("取消", null)
+            .create()
+
+        dialog.show()
+
+        // 设置按钮颜色为粉色
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(resources.getColor(R.color.bilibili_pink, null))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(resources.getColor(R.color.bilibili_pink, null))
     }
 
     private fun setupViewPagerAndTabs() {
-        val adapter = PersonalPagerAdapter(requireActivity())
-        binding.viewPager.adapter = adapter
+        binding.viewPager.adapter = UserProfilePagerAdapter(requireActivity())
+        binding.viewPager.offscreenPageLimit = 3
 
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = tabTitles[position]
@@ -102,7 +163,18 @@ class PersonalFragment : Fragment() {
         _binding = null
     }
 
-    inner class PersonalPagerAdapter(fragmentActivity: FragmentActivity) : FragmentStateAdapter(fragmentActivity) {
+    companion object {
+        @JvmStatic
+        fun newInstance() = PersonalFragment()
+    }
+
+    fun switchToContributeTab() {
+        // 切换到投稿tab（position 1）
+        binding.viewPager.setCurrentItem(1, true)
+    }
+
+    inner class UserProfilePagerAdapter(fragmentActivity: FragmentActivity) :
+        FragmentStateAdapter(fragmentActivity) {
         override fun getItemCount(): Int = tabTitles.size
 
         override fun createFragment(position: Int): Fragment {

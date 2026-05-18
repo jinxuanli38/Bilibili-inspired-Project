@@ -30,6 +30,7 @@ class HomeFragment : Fragment() {
     }
 
     private var isFirstLoad = true
+    private var currentUserId: String = ""
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -45,8 +46,17 @@ class HomeFragment : Fragment() {
         binding.rvHomeVideo.adapter = videoAdapter
 
         // 设置用户ID - 优先使用传入的参数，否则使用当前登录用户ID
-        val userId = arguments?.getString("user_id") ?: SPUtils.getUserId()
-        viewModel.setUserId(userId)
+        currentUserId = arguments?.getString("user_id") ?: SPUtils.getUserId()
+        viewModel.setUserId(currentUserId)
+
+        // 查看更多按钮点击事件
+        binding.llMore.setOnClickListener {
+            // 跳转到个人主页的投稿tab
+            val mainActivity = requireActivity()
+            if (mainActivity is com.example.bilibili.MainActivity) {
+                mainActivity.switchToContributeTab()
+            }
+        }
 
         // 设置下拉刷新
         binding.swipeRefresh.setColorSchemeColors(android.graphics.Color.parseColor("#FB7299"))
@@ -85,12 +95,17 @@ class HomeFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        // 在Fragment可见时刷新数据
-        if (!isFirstLoad) {
-            videoAdapter.refresh()
-        } else {
-            isFirstLoad = false
+        // 在Fragment可见时检查并刷新数据
+        val newUserId = arguments?.getString("user_id") ?: SPUtils.getUserId()
+
+        // 如果用户ID发生变化，重新设置
+        if (newUserId != currentUserId) {
+            currentUserId = newUserId
+            viewModel.setUserId(currentUserId)
         }
+
+        // 总是刷新数据，确保获取最新内容
+        videoAdapter.refresh()
     }
 
     override fun onDestroyView() {

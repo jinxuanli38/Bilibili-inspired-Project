@@ -82,10 +82,13 @@ class FrontPageFragment : Fragment() {
             startActivity(intent)
         }
 
-        // 用户头像点击，跳转到编辑资料
+        // 用户头像点击，跳转到个人主页
         binding.ivAvatar.setOnClickListener {
-            val intent = Intent(requireContext(), com.example.bilibili.ui.user.EditProfileActivity::class.java)
-            startActivity(intent)
+            // 切换到个人主页Tab
+            val mainActivity = requireActivity()
+            if (mainActivity is com.example.bilibili.MainActivity) {
+                mainActivity.switchToPersonalTab()
+            }
         }
 
         // 加载热门搜索词

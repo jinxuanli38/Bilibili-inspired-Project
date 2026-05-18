@@ -7,7 +7,6 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.widget.PopupMenu
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.paging.LoadState
@@ -25,6 +24,8 @@ class ContributeFragment : Fragment() {
 
     private var currentOrderType = 0
     private var isFirstLoad = true
+    private var currentUserId: String = ""
+    private var shouldScrollToTop = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -45,18 +46,23 @@ class ContributeFragment : Fragment() {
         observeData()
 
         // 设置用户ID - 优先使用传入的参数，否则使用当前登录用户ID
-        val userId = arguments?.getString("user_id") ?: SPUtils.getUserId()
-        viewModel.setParams(userId, currentOrderType)
+        currentUserId = arguments?.getString("user_id") ?: SPUtils.getUserId()
+        viewModel.setParams(currentUserId, currentOrderType)
     }
 
     override fun onResume() {
         super.onResume()
-        // 在Fragment可见时刷新数据
-        if (!isFirstLoad) {
-            adapter.refresh()
-        } else {
-            isFirstLoad = false
+        // 在Fragment可见时检查并刷新数据
+        val newUserId = arguments?.getString("user_id") ?: SPUtils.getUserId()
+
+        // 如果用户ID发生变化，重新设置并刷新数据
+        if (newUserId != currentUserId) {
+            currentUserId = newUserId
+            viewModel.setParams(currentUserId, currentOrderType)
         }
+
+        // 总是刷新数据，确保获取最新内容
+        adapter.refresh()
     }
 
     private fun setupSwipeRefresh() {
@@ -77,20 +83,25 @@ class ContributeFragment : Fragment() {
     }
 
     private fun setupSortClick() {
-        binding.New.setOnClickListener { view ->
-            val popup = PopupMenu(requireContext(), view)
-            popup.menu.add(0, 0, 0, "最新发布")
-            popup.menu.add(0, 1, 1, "最多播放")
-            popup.menu.add(0, 2, 2, "最多收藏")
+        binding.New.setOnClickListener {
+            // 循环切换排序状态: 0 -> 1 -> 2 -> 0
+            currentOrderType = (currentOrderType + 1) % 3
 
-            popup.setOnMenuItemClickListener { item ->
-                currentOrderType = item.itemId
-                binding.NewText.text = item.title
-                binding.NewText.setTextColor(Color.parseColor("#FB7299"))
-                viewModel.setParams(SPUtils.getUserId(), currentOrderType)
-                true
+            // 更新文本，保持灰色
+            when (currentOrderType) {
+                0 -> binding.NewText.text = "最新发布"
+                1 -> binding.NewText.text = "最多播放"
+                2 -> binding.NewText.text = "最多收藏"
             }
-            popup.show()
+
+            // 更新ViewModel参数并刷新数据
+            viewModel.setParams(currentUserId, currentOrderType)
+
+            // 标记需要滚动到顶部
+            shouldScrollToTop = true
+
+            // 然后刷新数据
+            adapter.refresh()
         }
     }
 
@@ -104,6 +115,12 @@ class ContributeFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             adapter.loadStateFlow.collect { loadState ->
                 binding.swipeRefresh.isRefreshing = loadState.refresh is LoadState.Loading
+
+                // 当刷新完成且需要滚动到顶部时
+                if (loadState.refresh is LoadState.NotLoading && shouldScrollToTop) {
+                    binding.rvVideoList.scrollToPosition(0)
+                    shouldScrollToTop = false
+                }
             }
         }
     }

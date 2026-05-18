@@ -110,4 +110,17 @@
         <item name="android:textStyle">normal</item>
     </style>
 
+    <style name="BilibiliDatePickerTheme" parent="Theme.AppCompat.Light.Dialog">
+        <item name="colorAccent">#FB7299</item>
+        <item name="colorPrimary">#FB7299</item>
+        <item name="colorControlActivated">#FB7299</item>
+    </style>
+
+    <style name="BilibiliEditTextStyle" parent="Widget.AppCompat.EditText">
+        <item name="colorAccent">#FB7299</item>
+        <item name="colorControlActivated">#FB7299</item>
+        <item name="colorControlHighlight">#FB7299</item>
+        <item name="colorControlNormal">#CCCCCC</item>
+    </style>
+
 </resources>

@@ -1,10 +1,12 @@
 package com.example.bilibili.ui.user
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.FragmentActivity
@@ -15,8 +17,10 @@ import com.example.bilibili.data.api.PostService
 import com.example.bilibili.databinding.ActivityUserProfileBinding
 import com.example.bilibili.ui.personal.contribute.ContributeFragment
 import com.example.bilibili.ui.personal.home.HomeFragment
+import com.example.bilibili.ui.login.LoginActivity
 import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.RetrofitClient
+import com.example.bilibili.util.SPUtils
 import com.example.bilibili.util.ToastUtils
 import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +60,9 @@ class UserProfileActivity : AppCompatActivity() {
         // 初始化布局
         setupViewPagerAndTabs()
 
+        // 设置退出登录按钮
+        setupLogoutButton()
+
         // 加载用户信息
         loadUserInfo()
 
@@ -71,10 +78,59 @@ class UserProfileActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupLogoutButton() {
+        // 检查是否是当前用户
+        val currentUserId = SPUtils.getUserId()
+        val isCurrentUser = (targetUserId == currentUserId)
+
+        if (isCurrentUser) {
+            // 显示退出登录按钮
+            binding.btnLogout.visibility = View.VISIBLE
+            binding.btnLogout.setOnClickListener {
+                showLogoutDialog()
+            }
+        } else {
+            // 隐藏退出登录按钮
+            binding.btnLogout.visibility = View.GONE
+        }
+    }
+
+    private fun showLogoutDialog() {
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("退出登录")
+            .setMessage("确定要退出登录吗？")
+            .setPositiveButton("确定") { _, _ ->
+                // 退出登录逻辑
+                SPUtils.cleanToken()
+                val intent = Intent(this, LoginActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+                finish()
+            }
+            .setNegativeButton("取消", null)
+            .create()
+
+        dialog.show()
+
+        // 设置按钮颜色为粉色
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(resources.getColor(R.color.bilibili_pink, null))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(resources.getColor(R.color.bilibili_pink, null))
+    }
+
     private fun setupStatusBarPadding() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
-            binding.root.setPadding(0, statusBarHeight, 0, 0)
+
+            // 只给顶部banner添加状态栏padding
+            val params = binding.ivBanner.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+            params.topMargin = statusBarHeight
+            binding.ivBanner.layoutParams = params
+
+            // 给返回按钮也添加顶部padding
+            val backParams = binding.ivBack.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+            backParams.topMargin = statusBarHeight
+            binding.ivBack.layoutParams = backParams
+
             insets
         }
     }

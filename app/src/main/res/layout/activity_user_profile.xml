@@ -18,12 +18,27 @@
         app:layout_constraintStart_toStartOf="parent"
         android:translationZ="1dp"/>
 
+    <!-- 退出登录按钮（仅当前用户可见） -->
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/btn_logout"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginEnd="8dp"
+        android:padding="6dp"
+        android:src="@drawable/ic_logout"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/iv_back"
+        app:shapeAppearanceOverlay="@style/CircleImage" />
+
     <ImageView
         android:id="@+id/iv_banner"
         android:layout_width="0dp"
         android:layout_height="160dp"
         android:scaleType="centerCrop"
         android:src="@drawable/bg_profile_banner"
+        android:paddingTop="0dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -36,9 +51,9 @@
         android:padding="2dp"
         android:src="@drawable/ic_avatar_default"
         android:translationY="20dp"
-        app:layout_constraintBottom_toBottomOf="@+id/iv_banner"
+        app:layout_constraintBottom_toBottomOf="@id/iv_banner"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/iv_banner"
+        app:layout_constraintTop_toBottomOf="@id/iv_banner"
         app:shapeAppearanceOverlay="@style/CircleImage" />
 
     <LinearLayout
@@ -53,7 +68,6 @@
         app:layout_constraintTop_toBottomOf="@id/iv_banner">
 
         <LinearLayout style="@style/UserStatItemStyle">
-
             <TextView
                 android:id="@+id/tv_fans_count"
                 style="@style/UserStatNumberStyle"
@@ -70,7 +84,6 @@
             android:background="#EEEEEE" />
 
         <LinearLayout style="@style/UserStatItemStyle">
-
             <TextView
                 android:id="@+id/tv_follow_count"
                 style="@style/UserStatNumberStyle"
@@ -87,7 +100,6 @@
             android:background="#EEEEEE" />
 
         <LinearLayout style="@style/UserStatItemStyle">
-
             <TextView
                 android:id="@+id/tv_like_count"
                 style="@style/UserStatNumberStyle"
@@ -112,8 +124,8 @@
         android:textColor="#FB7299"
         android:textSize="13sp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/ll_stats"
-        app:layout_constraintTop_toBottomOf="@+id/ll_stats" />
+        app:layout_constraintStart_toStartOf="@id/ll_stats"
+        app:layout_constraintTop_toBottomOf="@id/ll_stats" />
 
     <TextView
         android:id="@+id/tv_nickname"
@@ -124,7 +136,7 @@
         android:textColor="#212121"
         android:textSize="20sp"
         android:textStyle="bold"
-        app:layout_constraintStart_toStartOf="@+id/iv_avatar"
+        app:layout_constraintStart_toStartOf="@id/iv_avatar"
         app:layout_constraintTop_toBottomOf="@id/btn_focus" />
 
     <TextView
@@ -139,7 +151,7 @@
         android:textColor="#757575"
         android:textSize="13sp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/tv_nickname"
+        app:layout_constraintStart_toStartOf="@id/tv_nickname"
         app:layout_constraintTop_toBottomOf="@id/tv_nickname" />
 
     <com.google.android.material.tabs.TabLayout
