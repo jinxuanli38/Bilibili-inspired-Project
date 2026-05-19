@@ -1,11 +1,14 @@
 package com.example.bilibili.ui.playVideo
 
+import android.app.PictureInPictureParams
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
+import android.widget.ImageView
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -14,6 +17,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.viewpager2.adapter.FragmentStateAdapter
+import com.example.bilibili.MainActivity
 import com.example.bilibili.R
 import com.example.bilibili.data.model.DanmuEntity
 import com.example.bilibili.databinding.ActivityPlayVideoBinding
@@ -25,7 +29,9 @@ import com.example.bilibili.util.ToastUtils
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
+import com.shuyu.gsyvideoplayer.GSYVideoManager.releaseAllVideos
 import com.shuyu.gsyvideoplayer.utils.OrientationUtils
+import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
 
 class PlayVideoActivity : AppCompatActivity() {
 
@@ -39,6 +45,10 @@ class PlayVideoActivity : AppCompatActivity() {
 
     private lateinit var currentVideoId: String
 
+    private var currentVideoUrl: String? = null
+
+    private var currentVideoTitle: String? = null
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,6 +56,22 @@ class PlayVideoActivity : AppCompatActivity() {
         enableEdgeToEdge()
         binding = ActivityPlayVideoBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        val ivGoHome = binding.videoPlayer.findViewById<ImageView>(R.id.iv_go_home)
+        ivGoHome?.setOnClickListener {
+            // 彻底停掉正在放的视频和音频，释放底层内核
+            releaseAllVideos()
+
+            // 跳转到主页 (把 MainActivity 换成你项目里实际的主页 Activity)
+            val intent = Intent(this, MainActivity::class.java).apply {
+                // 关键：利用这两个 Flag 清空当前所有视频历史页面栈，让主页处于最顶层
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            startActivity(intent)
+
+            // 关掉当前的播放页面
+            finish()
+        }
 
         // 2. 初始化各组件
         initSystemUI()
@@ -167,6 +193,8 @@ class PlayVideoActivity : AppCompatActivity() {
         // 观察播放地址：一旦拿到 M3U8 地址，立刻初始化 GSYPlayer
         viewModel.videoUrlLive.observe(this) { url ->
             if (!url.isNullOrEmpty()) {
+                currentVideoUrl = url
+                currentVideoTitle = "视频播放"
                 initPlayer(url, "视频播放")
             }
         }
@@ -188,10 +216,49 @@ class PlayVideoActivity : AppCompatActivity() {
 
         // 观察弹幕数据
         viewModel.danmuListLive.observe(this) { danmuEntities ->
+            // 否则新视频一开播，旧视频的弹幕还在引擎里飘，时钟直接对撞卡死！
+            binding.videoPlayer.danmakuView?.removeAllDanmakus(true)
+
             // 发送所有加载的弹幕
             danmuEntities.forEach { entity ->
                 binding.videoPlayer.addDanmakuEntity(entity)
             }
+        }
+    }
+
+    // 当用户主动按 Home 键或划出 App 返回桌面时触发
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+
+        // 如果视频正在播放，且系统版本支持（Android 8.0+），就直接切入画中画小窗
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val isPlaying = binding.videoPlayer.currentPlayer.currentState == GSYVideoView.CURRENT_STATE_PLAYING
+            if (isPlaying) {
+                val params = PictureInPictureParams.Builder().build()
+                enterPictureInPictureMode(params)
+            }
+        }
+    }
+
+    // 当画中画小窗状态发生改变时回调
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+
+        if (isInPictureInPictureMode) {
+            // 1. 已经进入桌面小窗：隐藏顶部和底部控制栏
+            binding.videoPlayer.findViewById<View>(R.id.layout_top)?.visibility = View.GONE
+            binding.videoPlayer.findViewById<View>(R.id.layout_bottom)?.visibility = View.GONE
+            binding.videoPlayer.findViewById<View>(R.id.bottom_progressbar)?.visibility = View.GONE
+
+            // 2. 如果你有弹幕，小窗里也必须关掉，否则密密麻麻卡死
+            binding.videoPlayer.danmakuView?.hide()
+        } else {
+            // 3. 用户从小窗点击恢复，回到了主 App：把控制栏和弹幕重新变回来
+            binding.videoPlayer.findViewById<View>(R.id.layout_top)?.visibility = View.VISIBLE
+            binding.videoPlayer.findViewById<View>(R.id.layout_bottom)?.visibility = View.VISIBLE
+            binding.videoPlayer.findViewById<View>(R.id.bottom_progressbar)?.visibility = View.VISIBLE
+
+            binding.videoPlayer.danmakuView?.show()
         }
     }
 
@@ -263,33 +330,80 @@ class PlayVideoActivity : AppCompatActivity() {
      * 初始化 GSYVideoPlayer
      */
     private fun initPlayer(url: String, title: String) {
-        binding.videoPlayer.setUp(url, true, title)
-        binding.videoPlayer.setIsTouchWiget(true)
-        // 隐藏自带的返回键（我们用的是自定义的 ivStickyBack）
-        binding.videoPlayer.backButton.visibility = View.GONE
-        // 自动开始播放
-        binding.videoPlayer.startPlayLogic()
-    }
+        binding.videoPlayer.onVideoReset()
 
-    // 必须重写这个方法，否则切换全屏时由于 Activity 重置会导致播放器白屏或报错
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        // 自动调整全屏切换位置
-        binding.videoPlayer.onConfigurationChanged(this, newConfig, orientationUtils)
+        binding.videoPlayer.setUp(url, true, null)
+        binding.videoPlayer.setIsTouchWiget(true)
+
+        // 隐藏自带的返回键
+        binding.videoPlayer.backButton.visibility = View.GONE
+
+        binding.videoPlayer.post {
+            binding.videoPlayer.startPlayLogic()
+        }
     }
 
     override fun onPause() {
         super.onPause()
-        binding.videoPlayer.onVideoPause()
+        // 进入了桌面画中画模式，视频不暂停继续播放
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode) {
+            return
+        }
+
+        if (binding.videoPlayer.currentPlayer != null) {
+            binding.videoPlayer.onVideoPause()
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        binding.videoPlayer.onVideoResume()
+        // 从小窗回到了大窗
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode) {
+            if (binding.videoPlayer.currentPlayer != null) {
+                binding.videoPlayer.onVideoResume()
+            }
+            return
+        }
+
+        try {
+            // 检查播放器是否可用
+            if (binding.videoPlayer.currentPlayer != null) {
+                // 播放器正常，恢复播放
+                binding.videoPlayer.onVideoResume()
+            } else {
+                // 播放器已被释放或未初始化，重新初始化
+                if (!currentVideoUrl.isNullOrEmpty()) {
+                    currentVideoUrl?.let { url ->
+                        currentVideoTitle?.let { title ->
+                            initPlayer(url, title)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // 发生异常时尝试重新初始化
+            if (!currentVideoUrl.isNullOrEmpty()) {
+                currentVideoUrl?.let { url ->
+                    currentVideoTitle?.let { title ->
+                        initPlayer(url, title)
+                    }
+                }
+            }
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        binding.videoPlayer.release()
+        // 彻底释放屏幕旋转工具类，防止严重的内存泄漏和传感器死锁
+        if (::orientationUtils.isInitialized) {
+            orientationUtils.releaseListener()
+        }
+
+        // 只释放当前播放器，不影响其他Activity的播放器
+        try {
+            binding.videoPlayer.release()
+        } catch (e: Exception) {
+            // 忽略释放异常
+        }
     }
 }

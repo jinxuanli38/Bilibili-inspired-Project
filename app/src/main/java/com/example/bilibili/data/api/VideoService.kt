@@ -49,4 +49,11 @@ interface VideoService {
         @Field("videoId") videoId: String
     ): String
 
+    // 实时获取在线人数
+    @POST("video/reportVideoPlayOnline")
+    @FormUrlEncoded
+    suspend fun reportVideoPlayOnline(
+        @Field("fileId") fileId: String,
+        @Field("deviceId") deviceId: String
+    ): String
 }

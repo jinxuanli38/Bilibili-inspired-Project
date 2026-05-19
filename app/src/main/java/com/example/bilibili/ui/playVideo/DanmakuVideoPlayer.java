@@ -36,17 +36,6 @@ import master.flame.danmaku.danmaku.parser.BaseDanmakuParser;
 import master.flame.danmaku.danmaku.parser.IDataSource;
 import master.flame.danmaku.ui.widget.DanmakuView;
 
-/**
- * Created by guoshuyu on 2017/2/16.
- * <p>
- * 配置弹幕使用的播放器，目前使用的是本地模拟数据。
- * <p>
- * 模拟数据的弹幕时常比较短，后面的时长点是没有数据的。
- * <p>
- * 注意：这只是一个例子，演示如何集合弹幕，需要完善如弹出输入弹幕等的，可以自行完善。
- * 注意：b站的弹幕so只有v5 v7 x86、没有64，所以记得配置上ndk过滤。
- */
-
 public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
 
     private BaseDanmakuParser mParser;//解析器对象
@@ -85,16 +74,12 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
     protected void init(Context context) {
         super.init(context);
         mDanmakuView = (DanmakuView) findViewById(R.id.danmaku_view);
-        mSendDanmaku = (TextView) findViewById(R.id.send_danmaku);
-        mToogleDanmaku = (TextView) findViewById(R.id.toogle_danmaku);
 
-        //初始化弹幕显示
+        // 🟢 核心修复：强制在小屏初始化时，把 XML 里的返回键绑定给父类的 mBackButton 变量
+        mBackButton = findViewById(R.id.back);
+
+        // 初始化弹幕显示
         initDanmaku();
-
-        mSendDanmaku.setOnClickListener(this);
-        mToogleDanmaku.setOnClickListener(this);
-
-
     }
 
     @Override
@@ -127,8 +112,13 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
 
     @Override
     public void onCompletion() {
-        super.onCompletion();
         releaseDanmaku(this);
+
+        mCurrentState = CURRENT_STATE_AUTO_COMPLETE;
+
+        changeUiToCompleteShow();
+
+        cancelProgressTimer();
     }
 
 
@@ -149,23 +139,18 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
     public void onClick(View v) {
         // 先执行父类的点击逻辑（处理播放、暂停、全屏按钮等）
         super.onClick(v);
-
-        int id = v.getId();
-
-        if (id == R.id.send_danmaku) {
-            // 点击了“发送弹幕”按钮
-//            addDanmakuEntity(true);
-        } else if (id == R.id.toogle_danmaku) {
-            // 点击了“弹幕开关”按钮
-            mDanmaKuShow = !mDanmaKuShow;
-            resolveDanmakuShow();
-        }
     }
 
     @Override
     protected void cloneParams(GSYBaseVideoPlayer from, GSYBaseVideoPlayer to) {
-        ((DanmakuVideoPlayer) to).mDumakuFile = ((DanmakuVideoPlayer) from).mDumakuFile;
         super.cloneParams(from, to);
+        if (from instanceof DanmakuVideoPlayer && to instanceof DanmakuVideoPlayer) {
+            // 🟢 核心修复：全屏切换时，必须把小屏播放器的弹幕上下文、解析器、开关状态全部移交
+            ((DanmakuVideoPlayer) to).mDanmakuContext = ((DanmakuVideoPlayer) from).mDanmakuContext;
+            ((DanmakuVideoPlayer) to).mParser = ((DanmakuVideoPlayer) from).mParser;
+            ((DanmakuVideoPlayer) to).mDanmaKuShow = ((DanmakuVideoPlayer) from).mDanmaKuShow;
+            ((DanmakuVideoPlayer) to).mDanmakuTimer = ((DanmakuVideoPlayer) from).mDanmakuTimer;
+        }
     }
 
     /**
@@ -233,19 +218,21 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
         overlappingEnablePair.put(BaseDanmaku.TYPE_SCROLL_RL, true);
         overlappingEnablePair.put(BaseDanmaku.TYPE_FIX_TOP, true);
 
+        // 设置上下文配置
         DanamakuAdapter danamakuAdapter = new DanamakuAdapter(mDanmakuView);
         mDanmakuContext = DanmakuContext.create();
         mDanmakuContext.setDanmakuStyle(IDisplayer.DANMAKU_STYLE_STROKEN, 3).setDuplicateMergingEnabled(false).setScrollSpeedFactor(1.2f).setScaleTextSize(1.2f)
                 .setCacheStuffer(new SpannedCacheStuffer(), danamakuAdapter) // 图文混排使用SpannedCacheStuffer
                 .setMaximumLines(maxLinesPair)
                 .preventOverlapping(overlappingEnablePair);
+        // 加载解析器
         if (mDanmakuView != null) {
             if (mDumakuFile != null) {
                 mParser = createParser(getIsStream(mDumakuFile));
             } else {
                 mParser = createParser(null); // 只有没文件时才传null
             }
-
+            // 加载解析器和上下文配置
             mDanmakuView.prepare(mParser, mDanmakuContext);
 
             mDanmakuView.setCallback(new master.flame.danmaku.controller.DrawHandler.Callback() {
@@ -276,6 +263,7 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
                     }
                 }
             });
+            // 开启绘制缓存
             mDanmakuView.enableDanmakuDrawingCache(true);
         }
     }
@@ -311,15 +299,23 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
         post(new Runnable() {
             @Override
             public void run() {
+                // 基础检查：如果弹幕图层压根不存在，直接返回
+                if (getDanmakuView() == null) return;
+
                 if (mDanmaKuShow) {
-                    if (!getDanmakuView().isShown())
+                    if (!getDanmakuView().isShown()) {
                         getDanmakuView().show();
-                    mToogleDanmaku.setText("弹幕关");
+                    }
+                    if (mToogleDanmaku != null) {
+                        mToogleDanmaku.setText("弹幕关");
+                    }
                 } else {
                     if (getDanmakuView().isShown()) {
                         getDanmakuView().hide();
                     }
-                    mToogleDanmaku.setText("弹幕开");
+                    if (mToogleDanmaku != null) {
+                        mToogleDanmaku.setText("弹幕开");
+                    }
                 }
             }
         });
@@ -351,16 +347,14 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
      * @return
      */
     private BaseDanmakuParser createParser(InputStream stream) {
-        // 无论有没有流，我们都实例化 BiliDanmukuParser
         BaseDanmakuParser parser = new BiliDanmukuParser();
 
+        // 这样才能顺利触发下方的 loader.load()，从而彻底激活整个弹幕渲染画布！
         if (stream == null) {
-            // 如果没有流，直接返回这个空对象即可
-            // 它虽然没数据，但它的内部逻辑（坐标计算等）是完整的
-            return parser;
+            String emptyXml = "<i></i>";
+            stream = new ByteArrayInputStream(emptyXml.getBytes());
         }
 
-        // 如果有流（比如以后你又想读本地文件了），走正常的加载逻辑
         ILoader loader = DanmakuLoaderFactory.create(DanmakuLoaderFactory.TAG_BILI);
         try {
             loader.load(stream);
@@ -429,16 +423,18 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
         BaseDanmaku danmaku = mDanmakuContext.mDanmakuFactory.createDanmaku(BaseDanmaku.TYPE_SCROLL_RL);
         if (danmaku == null) return;
 
-        // 3. 填入你的网络数据
-        danmaku.text = entity.getText(); // 弹幕文本内容
+        // 3. 填入你的网络/本地输入数据
+        danmaku.text = entity.getText();
         danmaku.padding = 5;
-        danmaku.priority = 8; // 优先级，建议设为1以上确保不被过滤
-        danmaku.isLive = false; // 你的数据通常是录播/点播弹幕
+        danmaku.priority = 10; // 提高优先级，确保在弹幕过多时不会被引擎策略自动过滤
+        danmaku.isLive = false;
 
-        danmaku.setTime(entity.getTime() * 1000L + 500);
+        // 4. 精准对齐时间戳
+        // 如果是网络返回的历史弹幕，entity.getTime() 通常是秒，转为毫秒乘以 1000L
+        danmaku.setTime(entity.getTime() * 1000L);
 
-        // 4. 设置视觉样式
-        danmaku.textSize = 20f * (mParser.getDisplayer().getDensity() - 0.6f);
+        // 5. 优化视觉样式（不再通过 mParser 获取，直接利用 Context 安全获取屏幕字体缩放比）
+        danmaku.textSize = 18f * getContext().getResources().getDisplayMetrics().scaledDensity;
 
         // 解析颜色字符串（例如 "#FFFFFF"）
         try {
@@ -447,14 +443,19 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
             danmaku.textColor = Color.WHITE; // 解析失败默认白色
         }
 
-        // 🔧 关键修复：设置缺失的属性
+        // 🔧 关键修复：完美替换掉之前报错的 getDanmakuTimer() 逻辑
         if (mDanmakuTimer != null) {
-            danmaku.setTimer(mDanmakuTimer); // 设置定时器
-
+            danmaku.setTimer(mDanmakuTimer);
+        } else {
+            if (mParser != null && mParser.getTimer() != null) {
+                danmaku.setTimer(mParser.getTimer());
+            } else {
+                danmaku.setTimer(new DanmakuTimer(getCurrentPositionWhenPlaying()));
+            }
         }
-        danmaku.flags = mDanmakuContext.mGlobalFlagValues; // 设置全局标志
+        danmaku.flags = mDanmakuContext.mGlobalFlagValues;
 
-        // 5. 投喂给引擎
+        // 6. 投喂给引擎
         mDanmakuView.addDanmaku(danmaku);
     }
 

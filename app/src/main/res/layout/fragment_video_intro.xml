@@ -146,9 +146,11 @@
                 android:layout_width="14dp"
                 android:layout_height="14dp"
                 android:layout_marginStart="12dp"
+                android:src="@drawable/ic_watching_tiny"
                 app:tint="#999999" />
 
             <TextView
+                android:id="@+id/tv_online_count"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
@@ -158,43 +160,66 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/ll_expandable_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="12dp">
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="12dp">
+
+                <TextView
+                    android:id="@+id/tv_video_id"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ID: AKMIwqDDgh"
+                    android:textColor="#999999"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_marginStart="12dp"
+                    android:src="@drawable/ic_no_repost"
+                    app:tint="#999999" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="未经作者授权禁止转载"
+                    android:textColor="#999999"
+                    android:textSize="12sp" />
+            </LinearLayout>
 
             <TextView
-                android:layout_width="wrap_content"
+                android:id="@+id/tv_video_introduction"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="BV17soMBtETZ"
-                android:textColor="#999999"
-                android:textSize="12sp" />
+                android:layout_marginTop="10dp"
+                android:lineSpacingExtra="3dp"
+                android:paddingHorizontal="12dp"
+                android:text="这里是视频简介..."
+                android:textColor="#61666D"
+                android:textSize="13sp" />
 
-            <ImageView
-                android:layout_width="14dp"
-                android:layout_height="14dp"
-                android:layout_marginStart="12dp"
-                android:src="@drawable/ic_no_repost"
-                app:tint="#999999" />
-
-            <TextView
-                android:layout_width="wrap_content"
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/cg_tags"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="未经作者授权禁止转载"
-                android:textColor="#999999"
-                android:textSize="12sp" />
+                android:layout_marginTop="12dp"
+                android:paddingHorizontal="12dp"
+                android:theme="@style/Theme.MaterialComponents.Light"
+                app:chipSpacingHorizontal="8dp"
+
+                app:chipSpacingVertical="4dp" />
         </LinearLayout>
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/cg_tags"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:paddingHorizontal="12dp"
-            app:chipSpacingHorizontal="8dp"
-            app:chipSpacingVertical="4dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -292,7 +317,7 @@
             android:layout_height="wrap_content"
             android:nestedScrollingEnabled="false"
             android:paddingBottom="20dp"
-            tools:listitem="@layout/item_video_contribute_grid"/>
+            tools:listitem="@layout/item_video_recommend_grid" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
