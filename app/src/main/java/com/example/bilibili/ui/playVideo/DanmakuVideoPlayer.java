@@ -1,11 +1,13 @@
 package com.example.bilibili.ui.playVideo;
 
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import com.example.bilibili.R;
@@ -46,7 +48,8 @@ import master.flame.danmaku.ui.widget.DanmakuView;
  */
 public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
 
-    private static final int SEEK_BAR_MAX = 1000;
+    /** 与 GSY 默认进度刻度一致（0~100），避免拖动换算偏差 */
+    private static final int SEEK_BAR_MAX = 100;
 
     /** 与视频偏差超过该值才走引擎 requestSync（设很大，避免播放中弹回） */
     private static final long DANMAKU_SYNC_THRESHOLD_MS = 60 * 60 * 1000L;
@@ -113,7 +116,7 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
     }
 
     private void configureProgressBarPrecision() {
-        if (mProgressBar != null) {
+        if (mProgressBar != null && mProgressBar.getMax() != SEEK_BAR_MAX) {
             mProgressBar.setMax(SEEK_BAR_MAX);
         }
     }
@@ -166,13 +169,104 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
         }
     }
 
+    /**
+     * 播放结束：不调用 super（会 removeAllViews 导致黑屏），保留最后一帧并同步进度条。
+     */
+    @Override
+    public void onAutoCompletion() {
+        long duration = getDuration();
+        keepLastFrameAtEnd(duration);
+        danmakuOnPause();
+        releaseDanmaku(this);
+
+        setStateAndUi(CURRENT_STATE_AUTO_COMPLETE);
+        syncProgressToEnd(duration);
+        hideThumbCover();
+
+        mSaveChangeViewTIme = 0;
+        mCurrentPosition = duration > 0 ? duration : 0;
+
+        if (getGSYVideoManager() != null && !mIfCurrentIsFullscreen) {
+            getGSYVideoManager().setLastListener(null);
+        }
+        if (mAudioFocusManager != null) {
+            mAudioFocusManager.abandonAudioFocus();
+        }
+        if (mContext instanceof Activity) {
+            try {
+                ((Activity) mContext).getWindow()
+                        .clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (mVideoAllCallBack != null && isCurrentMediaListener()) {
+            mVideoAllCallBack.onAutoComplete(mOriginUrl, mTitle, this);
+        }
+        mHadPlay = false;
+    }
+
+    /** 完成态不展示黑色封面层，否则会挡住最后一帧 */
+    @Override
+    protected void changeUiToCompleteShow() {
+        super.changeUiToCompleteShow();
+        hideThumbCover();
+    }
+
+    private void hideThumbCover() {
+        if (mThumbImageViewLayout != null) {
+            mThumbImageViewLayout.setVisibility(GONE);
+        }
+    }
+
+    /** prepare 等场景触发的 completion，走父类重置逻辑即可 */
     @Override
     public void onCompletion() {
         super.onCompletion();
         releaseDanmaku(this);
-        mCurrentState = CURRENT_STATE_AUTO_COMPLETE;
-        changeUiToCompleteShow();
-        cancelProgressTimer();
+    }
+
+    @Override
+    protected void setStateAndUi(int state) {
+        super.setStateAndUi(state);
+        if (state == CURRENT_STATE_AUTO_COMPLETE) {
+            syncProgressToEnd(getDuration());
+        }
+    }
+
+    private void keepLastFrameAtEnd(long durationMs) {
+        if (durationMs <= 0 || getGSYVideoManager() == null) {
+            return;
+        }
+        try {
+            long seekPos = Math.max(0, durationMs - 300);
+            getGSYVideoManager().seekTo(seekPos);
+            mSeekTimePosition = seekPos;
+            mCurrentPosition = seekPos;
+        } catch (Exception e) {
+            Debuger.printfWarning(e.toString());
+        }
+    }
+
+    private void syncProgressToEnd(long durationMs) {
+        if (durationMs <= 0) {
+            durationMs = getDuration();
+        }
+        if (durationMs <= 0) {
+            return;
+        }
+        if (mProgressBar != null) {
+            mProgressBar.setProgress(getSeekBarMax());
+        }
+        if (mBottomProgressBar != null) {
+            mBottomProgressBar.setProgress(100);
+        }
+        if (mTotalTimeTextView != null) {
+            mTotalTimeTextView.setText(CommonUtil.stringForTime(durationMs));
+        }
+        if (mCurrentTimeTextView != null) {
+            mCurrentTimeTextView.setText(CommonUtil.stringForTime(durationMs));
+        }
     }
 
     @Override
@@ -197,6 +291,7 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
     @Override
     public void onStartTrackingTouch(SeekBar seekBar) {
         mHadSeekTouch = true;
+        mUserSeekingDanmaku = true;
         startPreviewSeek();
     }
 
@@ -209,26 +304,54 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
                 mVideoAllCallBack.onClickSeekbar(mOriginUrl, mTitle, this);
             }
         }
-        if (getGSYVideoManager() != null && mHadPlay) {
-            try {
-                long duration = getDuration();
-                if (duration > 0) {
-                    long time = progressToTimeMs(seekBar.getProgress(), seekBar.getMax(), duration);
-                    mCurrentPosition = time;
-                    getGSYVideoManager().seekTo(time);
-                }
-            } catch (Exception e) {
-                Debuger.printfWarning(e.toString());
-            }
-        }
+
         mHadSeekTouch = false;
         endPreviewSeek();
-        if (getGSYVideoManager() != null && mHadPlay) {
-            long pos = getCurrentPositionWhenPlaying();
-            if (pos >= 0) {
-                post(() -> seekDanmakuByUser(pos));
-            }
+
+        if (getGSYVideoManager() == null) {
+            mUserSeekingDanmaku = false;
+            return;
         }
+
+        long duration = getDuration();
+        if (duration <= 0) {
+            mUserSeekingDanmaku = false;
+            return;
+        }
+
+        int max = seekBar.getMax() > 0 ? seekBar.getMax() : getSeekBarMax();
+        long time = Math.min(progressToTimeMs(seekBar.getProgress(), max, duration), duration);
+        mSeekTimePosition = time;
+        mCurrentPosition = time;
+
+        boolean wasComplete = mCurrentState == CURRENT_STATE_AUTO_COMPLETE;
+
+        try {
+            getGSYVideoManager().seekTo(time);
+        } catch (Exception e) {
+            Debuger.printfWarning(e.toString());
+        }
+
+        if (wasComplete) {
+            mHadPlay = true;
+            hideThumbCover();
+            setStateAndUi(CURRENT_STATE_PAUSE);
+        }
+
+        if (mProgressBar != null) {
+            mProgressBar.setProgress(toSeekBarProgress(time, duration));
+        }
+        if (mCurrentTimeTextView != null) {
+            mCurrentTimeTextView.setText(CommonUtil.stringForTime(time));
+        }
+        if (mBottomProgressBar != null) {
+            mBottomProgressBar.setProgress((int) (time * 100 / duration));
+        }
+
+        post(() -> {
+            seekDanmakuByUser(time);
+            mUserSeekingDanmaku = false;
+        });
     }
 
     @Override
@@ -294,18 +417,28 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
         dismissProgressDialog();
         dismissVolumeDialog();
         dismissBrightnessDialog();
-        if (mChangePosition && getGSYVideoManager() != null
-                && (mCurrentState == CURRENT_STATE_PLAYING || mCurrentState == CURRENT_STATE_PAUSE)) {
-            try {
-                getGSYVideoManager().seekTo(mSeekTimePosition);
-            } catch (Exception e) {
-                e.printStackTrace();
+        if (mChangePosition && getGSYVideoManager() != null) {
+            boolean wasComplete = mCurrentState == CURRENT_STATE_AUTO_COMPLETE;
+            boolean canSeek = mCurrentState == CURRENT_STATE_PLAYING
+                    || mCurrentState == CURRENT_STATE_PAUSE
+                    || wasComplete;
+            if (canSeek) {
+                try {
+                    getGSYVideoManager().seekTo(mSeekTimePosition);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                long duration = getDuration();
+                if (duration > 0 && mProgressBar != null) {
+                    mProgressBar.setProgress(toSeekBarProgress(mSeekTimePosition, duration));
+                }
+                if (wasComplete) {
+                    mHadPlay = true;
+                    hideThumbCover();
+                    setStateAndUi(CURRENT_STATE_PAUSE);
+                }
+                seekDanmakuByUser(mSeekTimePosition);
             }
-            long duration = getDuration();
-            if (duration > 0 && mProgressBar != null) {
-                mProgressBar.setProgress(toSeekBarProgress(mSeekTimePosition, duration));
-            }
-            seekDanmakuByUser(mSeekTimePosition);
             if (mVideoAllCallBack != null && isCurrentMediaListener()) {
                 mVideoAllCallBack.onTouchScreenSeekPosition(mOriginUrl, mTitle, this);
             }
