@@ -122,10 +122,24 @@
         android:textSize="16sp"
         android:autofillHints="password"
         android:imeOptions="actionNext|flagNoExtractUi"
+        android:paddingEnd="8dp"
 
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/btn_toggle_password"
         app:layout_constraintStart_toEndOf="@+id/tv_label_password"
         app:layout_constraintTop_toBottomOf="@+id/view_divider_nickname" />
+
+    <ImageButton
+        android:id="@+id/btn_toggle_password"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/toggle_password_visibility"
+        android:padding="8dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_visibility"
+        app:layout_constraintBottom_toBottomOf="@+id/et_password"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/et_password" />
 
     <View
         android:id="@+id/view_divider_2"
@@ -157,10 +171,24 @@
         android:textSize="16sp"
         android:autofillHints="password"
         android:imeOptions="actionNext|flagNoExtractUi"
+        android:paddingEnd="8dp"
 
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/btn_toggle_password_confirm"
         app:layout_constraintStart_toEndOf="@+id/tv_label_password_confirm"
         app:layout_constraintTop_toBottomOf="@+id/view_divider_2" />
+
+    <ImageButton
+        android:id="@+id/btn_toggle_password_confirm"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/toggle_password_visibility"
+        android:padding="8dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_visibility"
+        app:layout_constraintBottom_toBottomOf="@+id/et_password_confirm"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/et_password_confirm" />
 
     <View
         android:id="@+id/view_divider_password_confirm"

@@ -17,6 +17,8 @@ import com.bumptech.glide.Glide
 import com.example.bilibili.data.api.AccountService
 import com.example.bilibili.databinding.ActivityRegisterBinding
 import com.example.bilibili.databinding.DialogAgreementBinding
+import com.example.bilibili.util.AuthSessionHelper
+import com.example.bilibili.util.PasswordToggleHelper
 import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.ToastUtils
 import kotlinx.coroutines.launch
@@ -35,6 +37,9 @@ class RegisterActivity : AppCompatActivity() {
 
         binding = ActivityRegisterBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        PasswordToggleHelper.bind(binding.btnTogglePassword, binding.etPassword)
+        PasswordToggleHelper.bind(binding.btnTogglePasswordConfirm, binding.etPasswordConfirm)
 
         // 处理输入框的软键盘
         initEditConfigs()
@@ -196,8 +201,14 @@ class RegisterActivity : AppCompatActivity() {
                     )
                     val root = JSONObject(responseString)
                     if (root.optInt("code") == 200) {
-                        ToastUtils.showShort(this@RegisterActivity,"注册成功，请登录")
-                        finish()
+                        ToastUtils.showShort(this@RegisterActivity, "注册成功")
+                        val data = root.optJSONObject("data")
+                        if (data != null) {
+                            AuthSessionHelper.saveLoginData(data)
+                            AuthSessionHelper.navigateToMainAndFinish(this@RegisterActivity)
+                        } else {
+                            finish()
+                        }
                     } else {
                         ToastUtils.showShort(this@RegisterActivity,root.getString("message"))
                         // 重新加载验证码

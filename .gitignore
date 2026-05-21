@@ -14,5 +14,7 @@
 .cxx
 local.properties
 .idea/gradle.xml
-/dkplayer-java/
-/dkplayer-ui/
+
+# GSY 源码备份目录（使用 Gradle implementation 依赖即可）
+.gsy-tmp/
+.gsy-src/

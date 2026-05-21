@@ -15,14 +15,14 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
-import com.example.bilibili.MainActivity
 import com.example.bilibili.data.api.AccountService
 import com.example.bilibili.databinding.ActivityLoginBinding
 import com.example.bilibili.databinding.DialogAgreementBinding
 import com.example.bilibili.ui.register.RegisterActivity
+import com.example.bilibili.util.AuthSessionHelper
 import com.example.bilibili.util.MD5Utils
+import com.example.bilibili.util.PasswordToggleHelper
 import com.example.bilibili.util.RetrofitClient
-import com.example.bilibili.util.SPUtils
 import com.example.bilibili.util.ToastUtils
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -40,6 +40,8 @@ class LoginActivity : AppCompatActivity() {
         enableEdgeToEdge()
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        PasswordToggleHelper.bind(binding.btnTogglePassword, binding.etPassword)
 
         // 跳转到注册按钮监听
         binding.jumpToRegister.setOnClickListener {
@@ -93,24 +95,9 @@ class LoginActivity : AppCompatActivity() {
                     )
                     val root = JSONObject(responseString)
                     if (root.optInt("code") == 200) {
-                        ToastUtils.showShort(this@LoginActivity,"登录成功")
-                        val data = root.getJSONObject("data")
-                        // 保存token到SP
-                        SPUtils.saveToken(data.getString("token"))
-                        // 保存硬币
-                        SPUtils.saveCurrentCoinCount(data.optInt("currentCoinCount"))
-                        // 保存用户id
-                        SPUtils.saveUserId(data.getString("userId"))
-                        // 保存头像
-                        SPUtils.saveAvatar(data.getString("avatar"))
-                        // 保存昵称
-                        SPUtils.saveNickname(data.getString("nickName"))
-
-                        // 跳转到主页
-                        val intent = Intent(this@LoginActivity, MainActivity::class.java)
-                        startActivity(intent)
-                        finish()
-
+                        ToastUtils.showShort(this@LoginActivity, "登录成功")
+                        AuthSessionHelper.saveLoginData(root.getJSONObject("data"))
+                        AuthSessionHelper.navigateToMainAndFinish(this@LoginActivity)
                     } else {
                         ToastUtils.showShort(this@LoginActivity,root.getString("message"))
                         // 重新加载验证码

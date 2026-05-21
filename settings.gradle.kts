@@ -23,5 +23,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "bilibili"
 include(":app")
-include(":dkplayer-java")
-include(":dkplayer-ui")
