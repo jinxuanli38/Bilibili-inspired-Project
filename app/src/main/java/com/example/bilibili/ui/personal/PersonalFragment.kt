@@ -101,28 +101,25 @@ class PersonalFragment : Fragment() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
 
-            // 只给顶部banner添加状态栏padding
-            val params = binding.ivBanner.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
-            params.topMargin = statusBarHeight
-            binding.ivBanner.layoutParams = params
+            val bannerParams = binding.ivBanner.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+            bannerParams.topMargin = statusBarHeight
+            binding.ivBanner.layoutParams = bannerParams
+
+            val logoutParams = binding.ivLogout.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+            val logoutDesignTop = resources.getDimensionPixelSize(R.dimen.personal_logout_margin_top)
+            logoutParams.topMargin = statusBarHeight + logoutDesignTop
+            binding.ivLogout.layoutParams = logoutParams
 
             insets
         }
     }
 
     private fun setupLogoutButton() {
-        // 检查是否是当前用户
-        val currentUserId = SPUtils.getUserId()
-        val isCurrentUser = (currentUserId.isNotEmpty() && currentUserId == "self")
-
-        if (isCurrentUser) {
-            // 显示退出登录按钮
+        val isLoggedIn = SPUtils.getToken().isNotEmpty() && SPUtils.getUserId().isNotEmpty()
+        if (isLoggedIn) {
             binding.ivLogout.visibility = View.VISIBLE
-            binding.ivLogout.setOnClickListener {
-                showLogoutDialog()
-            }
+            binding.ivLogout.setOnClickListener { showLogoutDialog() }
         } else {
-            // 隐藏退出登录按钮
             binding.ivLogout.visibility = View.GONE
         }
     }

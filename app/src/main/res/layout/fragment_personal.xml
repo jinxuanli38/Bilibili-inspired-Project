@@ -10,14 +10,33 @@
         android:id="@+id/iv_banner"
         android:layout_width="0dp"
         android:layout_height="160dp"
+        android:paddingTop="0dp"
         android:scaleType="centerCrop"
         android:src="@drawable/bg_profile_banner"
-        android:paddingTop="0dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- 移除这个多余的退出登录按钮，使用在TabLayout后的新按钮 -->
+    <!-- 退出登录：实心白圆底 + 深色图标（右上角，仅已登录时显示） -->
+    <ImageView
+        android:id="@+id/iv_logout"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginTop="@dimen/personal_logout_margin_top"
+        android:layout_marginEnd="@dimen/personal_logout_margin_end"
+        android:background="@drawable/bg_circle_white_border"
+        android:clickable="true"
+        android:contentDescription="@string/logout"
+        android:focusable="true"
+        android:padding="9dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_logout"
+        android:translationZ="1dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="#3D3D3D"
+        tools:visibility="visible" />
 
     <com.google.android.material.imageview.ShapeableImageView
         android:id="@+id/iv_avatar"
@@ -154,21 +173,6 @@
         app:tabTextAppearance="@style/MyTabTextStyle"
         app:tabTextColor="#757575" />
 
-    <!-- 退出登录按钮（仅当前用户可见） -->
-    <com.google.android.material.imageview.ShapeableImageView
-        android:id="@+id/iv_logout"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginEnd="16dp"
-        android:padding="6dp"
-        android:src="@drawable/ic_logout"
-        android:visibility="gone"
-        android:clickable="true"
-        android:focusable="true"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@id/tab_layout"
-        app:shapeAppearanceOverlay="@style/CircleImage" />
     <View
         android:id="@+id/tab_divider"
         android:layout_width="match_parent"

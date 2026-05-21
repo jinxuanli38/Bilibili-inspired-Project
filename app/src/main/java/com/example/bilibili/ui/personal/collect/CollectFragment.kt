@@ -61,21 +61,13 @@ class CollectFragment : Fragment() {
         // 监听加载状态
         viewLifecycleOwner.lifecycleScope.launch {
             collectAdapter.loadStateFlow.collect { loadState ->
-                // 处理下拉刷新状态
                 binding.swipeRefresh.isRefreshing = loadState.refresh is LoadState.Loading
-
-                // 可以在这里显示加载状态
-                when (loadState.refresh) {
-                    is LoadState.Loading -> {
-                        // 显示加载中
-                    }
-                    is LoadState.NotLoading -> {
-                        // 加载完成
-                    }
-                    is LoadState.Error -> {
-                        // 显示错误信息
-                    }
-                }
+                PagingUiHelper.updateEmptyState(
+                    binding.emptyState.llEmpty,
+                    binding.recyclerView,
+                    collectAdapter,
+                    loadState
+                )
             }
         }
     }

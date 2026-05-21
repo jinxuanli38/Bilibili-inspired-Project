@@ -6,7 +6,6 @@ import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.text.Html
 import android.widget.TextView
 import android.animation.Animator
@@ -22,6 +21,7 @@ import android.widget.ImageView
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
@@ -50,6 +50,9 @@ import com.google.android.material.tabs.TabLayoutMediator
 import com.shuyu.gsyvideoplayer.GSYVideoManager.releaseAllVideos
 import com.shuyu.gsyvideoplayer.utils.CommonUtil
 import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class PlayVideoActivity : AppCompatActivity() {
 
@@ -57,9 +60,12 @@ class PlayVideoActivity : AppCompatActivity() {
 
     private val viewModel: PlayVideoViewModel by viewModels()
 
-    private lateinit var currentFileId: String
+    private var currentFileId: String = ""
 
-    private lateinit var currentVideoId: String
+    private var currentVideoId: String = ""
+
+    /** 播放量延迟刷新任务；Activity 销毁时由 lifecycleScope 自动取消 */
+    private var playCountRefreshJob: Job? = null
 
     private var currentVideoUrl: String? = null
 
@@ -506,9 +512,10 @@ class PlayVideoActivity : AppCompatActivity() {
             currentVideoId = videoInfo.optString("videoId")
         }
 
-        // 观察文件ID
         viewModel.fileIdLive.observe(this) { fileId ->
-            currentFileId = fileId
+            if (!fileId.isNullOrEmpty()) {
+                currentFileId = fileId
+            }
         }
 
         // 观察错误信息
@@ -641,9 +648,21 @@ class PlayVideoActivity : AppCompatActivity() {
         })
     }
 
-    @SuppressLint("HardwareIds")
-    private fun getAndroidId(): String {
-        return Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: ""
+    /**
+     * 后端播放量异步入库（Redis 队列），无推送；延迟后再请求 getVideoInfo 刷新简介区数字。
+     * 同一视频只保留一个任务，避免 tryStartPlayerWhenReady 多次触发重复刷新。
+     */
+    private fun schedulePlayCountUiRefresh() {
+        playCountRefreshJob?.cancel()
+        playCountRefreshJob = lifecycleScope.launch {
+            delay(2500)
+            val videoId = currentVideoId.ifEmpty {
+                viewModel.videoDetailLive.value?.optString("videoId").orEmpty()
+            }
+            if (videoId.isNotEmpty()) {
+                viewModel.refreshVideoDetail(videoId)
+            }
+        }
     }
 
     /** 弹幕先 prepare，再开播，与 GSY 官方一致，避免视频先跑、弹幕后 seek 弹回 */
@@ -657,10 +676,8 @@ class PlayVideoActivity : AppCompatActivity() {
         pendingPlaySeekMs = 0L
         binding.videoPlayer.resetDanmakuForNewVideo()
         binding.videoPlayer.setDanmakuList(list)
-        if (::currentFileId.isInitialized && currentFileId.isNotEmpty()) {
-            viewModel.reportVideoPlayOnline(currentFileId, getAndroidId())
-        }
         initPlayer(url, title, seekMs)
+        schedulePlayCountUiRefresh()
     }
 
     /**
@@ -759,6 +776,8 @@ class PlayVideoActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        playCountRefreshJob?.cancel()
+        playCountRefreshJob = null
         super.onDestroy()
         danmuExpandAnimator?.cancel()
 

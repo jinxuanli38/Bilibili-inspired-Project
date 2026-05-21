@@ -18,6 +18,7 @@ object SPUtils {
     private const val PERSONAL_INTRODUCTION = "personalIntroduction"
     private const val NOTICE_INFO = "noticeInfo"
     private const val KEY_SEARCH_HISTORY = "search_history_json"
+    private const val KEY_DEVICE_ID = "app_device_id"
 
     private lateinit var prefs: SharedPreferences
 
@@ -73,6 +74,14 @@ object SPUtils {
      */
     fun getUserId(): String {
         return prefs.getString(USER_ID, "") ?: ""
+    }
+
+    fun saveDeviceId(deviceId: String) {
+        prefs.edit().putString(KEY_DEVICE_ID, deviceId).apply()
+    }
+
+    fun getDeviceId(): String {
+        return prefs.getString(KEY_DEVICE_ID, "") ?: ""
     }
 
     /**

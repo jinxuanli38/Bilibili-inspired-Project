@@ -1,5 +1,8 @@
 package com.example.bilibili.util
 
+import android.view.View
+import androidx.paging.CombinedLoadStates
+import androidx.paging.LoadState
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -39,6 +42,18 @@ object PagingUiHelper {
         val footerAdapter = LoadStateAdapter(onRetry)
         recyclerView.layoutManager = LinearLayoutManager(recyclerView.context)
         recyclerView.adapter = contentAdapter.withLoadStateFooter(footerAdapter)
+    }
+
+    /** 列表无数据且非刷新中时显示空状态（与首页分类空列表一致） */
+    fun updateEmptyState(
+        emptyView: View,
+        listView: View,
+        contentAdapter: PagingDataAdapter<*, *>,
+        loadState: CombinedLoadStates
+    ) {
+        val isEmpty = contentAdapter.itemCount == 0 && loadState.refresh !is LoadState.Loading
+        emptyView.visibility = if (isEmpty) View.VISIBLE else View.GONE
+        listView.visibility = if (isEmpty) View.GONE else View.VISIBLE
     }
 
     /** 刷新完成后将列表滚回顶部，避免数据已重置但视口仍停在原位置 */

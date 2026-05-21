@@ -5,6 +5,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.View.GONE
+import android.view.View.VISIBLE
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -84,21 +86,15 @@ class HomeFragment : Fragment() {
         // 监听加载状态
         viewLifecycleOwner.lifecycleScope.launch {
             videoAdapter.loadStateFlow.collect { loadState ->
-                // 处理下拉刷新状态
                 binding.swipeRefresh.isRefreshing = loadState.refresh is LoadState.Loading
-
-                // 可以在这里显示加载状态
-                when (loadState.refresh) {
-                    is LoadState.Loading -> {
-                        // 显示加载中
-                    }
-                    is LoadState.NotLoading -> {
-                        // 加载完成
-                    }
-                    is LoadState.Error -> {
-                        // 显示错误信息
-                    }
-                }
+                PagingUiHelper.updateEmptyState(
+                    binding.emptyState.llEmpty,
+                    binding.rvHomeVideo,
+                    videoAdapter,
+                    loadState
+                )
+                val isEmpty = videoAdapter.itemCount == 0 && loadState.refresh !is LoadState.Loading
+                binding.llMore.visibility = if (isEmpty) GONE else VISIBLE
             }
         }
     }

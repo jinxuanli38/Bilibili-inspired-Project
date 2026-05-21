@@ -111,14 +111,10 @@ class ReleaseVideoActivity : AppCompatActivity() {
             introductionSheet.show(supportFragmentManager, "Introduction")
         }
 
-        // 监听发布按钮点击事件
         binding.btnPublish.setOnClickListener {
-            // 检查是否同意了协议
             if (binding.checkboxAgreement.isChecked) {
-                // 已同意，调用投稿方法
-                viewModel.postVideo()
+                publishVideo()
             } else {
-                // 未同意，显示协议对话框
                 showAgreementDialog()
             }
         }
@@ -328,6 +324,10 @@ class ReleaseVideoActivity : AppCompatActivity() {
         tagSheet.show(supportFragmentManager, "TagSheet")
     }
 
+    private fun publishVideo() {
+        viewModel.postVideo()
+    }
+
     /**
      * 显示用户协议弹窗
      */
@@ -357,6 +357,7 @@ class ReleaseVideoActivity : AppCompatActivity() {
         dialogBinding.btnDialogAgree.setOnClickListener {
             binding.checkboxAgreement.isChecked = true
             dialog.dismiss()
+            publishVideo()
         }
 
         dialogBinding.tvDialogDisagree.setOnClickListener {

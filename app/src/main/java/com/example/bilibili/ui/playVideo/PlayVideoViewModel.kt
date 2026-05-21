@@ -153,7 +153,7 @@ class PlayVideoViewModel : ViewModel() {
     }
 
     /**
-     * 上报视频播放（增加播放量、更新在线人数），需传分P的 fileId 而非 videoId
+     * 上报在线观看（仅「X人正在看」），与播放量无关；需传分 P 的 fileId。
      */
     fun reportVideoPlayOnline(fileId: String, deviceId: String) {
         if (fileId.isBlank() || deviceId.isBlank()) return
@@ -165,6 +165,28 @@ class PlayVideoViewModel : ViewModel() {
             } catch (e: Exception) {
                 Log.e("PlayVideo", "reportVideoPlayOnline failed: ${e.message}")
             }
+        }
+    }
+
+    /** 播放量由 /file/videoResource/{fileId}/ 触发后异步入库，延迟刷新简介区展示 */
+    fun refreshVideoDetail(videoId: String) {
+        if (videoId.isBlank()) return
+        viewModelScope.launch {
+            refreshVideoDetailInternal(videoId)
+        }
+    }
+
+    private suspend fun refreshVideoDetailInternal(videoId: String) {
+        try {
+            val infoRes = videoService.getVideoInfo(videoId)
+            val root = JSONObject(infoRes)
+            if (root.optInt("code") == 200) {
+                val data = root.getJSONObject("data")
+                videoDetailLive.postValue(data.getJSONObject("videoInfo"))
+                userActionsLive.postValue(data.optJSONArray("userActionList"))
+            }
+        } catch (e: Exception) {
+            Log.e("PlayVideo", "refreshVideoDetail failed: ${e.message}")
         }
     }
 

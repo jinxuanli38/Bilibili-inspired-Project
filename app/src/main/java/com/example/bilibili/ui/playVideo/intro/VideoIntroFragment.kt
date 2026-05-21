@@ -6,7 +6,6 @@ import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -19,6 +18,7 @@ import com.example.bilibili.R
 import com.example.bilibili.databinding.FragmentVideoIntroBinding
 import com.example.bilibili.ui.playVideo.PlayVideoViewModel
 import com.example.bilibili.ui.user.UserProfileActivity
+import com.example.bilibili.util.DeviceIdHelper
 import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.SPUtils
@@ -91,17 +91,6 @@ class VideoIntroFragment : Fragment() {
     }
 
     /**
-     * 获取设备ID
-     */
-    @SuppressLint("HardwareIds")
-    private fun getDeviceId(): String {
-        return Settings.Secure.getString(
-            requireContext().contentResolver,
-            Settings.Secure.ANDROID_ID
-        ) ?: ""
-    }
-
-    /**
      * 开始在线观看人数轮询
      */
     private fun startOnlinePolling(fileId: String) {
@@ -132,14 +121,15 @@ class VideoIntroFragment : Fragment() {
     private fun fetchOnlineCount(fileId: String) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val deviceId = getDeviceId()
+                val deviceId = DeviceIdHelper.getDeviceId(requireContext())
                 val videoService = RetrofitClient.create(VideoService::class.java)
                 val response = withContext(Dispatchers.IO) {
                     videoService.reportVideoPlayOnline(fileId, deviceId)
                 }
 
                 val jsonObject = JSONObject(response)
-                if (jsonObject.optString("status") == "success") {
+                val ok = jsonObject.optInt("code") == 200 || jsonObject.optString("status") == "success"
+                if (ok) {
                     val onlineCount = jsonObject.optInt("data", 0)
                     binding.tvOnlineCount.text = "${onlineCount}人正在看"
                 }

@@ -112,8 +112,13 @@ class ContributeFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             adapter.loadStateFlow.collect { loadState ->
                 binding.swipeRefresh.isRefreshing = loadState.refresh is LoadState.Loading
+                PagingUiHelper.updateEmptyState(
+                    binding.emptyState.llEmpty,
+                    binding.rvVideoList,
+                    adapter,
+                    loadState
+                )
 
-                // 当刷新完成且需要滚动到顶部时
                 if (loadState.refresh is LoadState.NotLoading && shouldScrollToTop) {
                     binding.rvVideoList.scrollToPosition(0)
                     shouldScrollToTop = false
