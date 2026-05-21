@@ -26,6 +26,11 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <include
+        layout="@layout/layout_video_end_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <androidx.cardview.widget.CardView
         android:id="@+id/layout_preview_layout"
         android:layout_width="wrap_content"
@@ -122,8 +127,8 @@
             android:id="@+id/start"
             android:layout_width="32dp"
             android:layout_height="32dp"
-            android:padding="4dp"
-            android:src="@drawable/video_click_play_selector" />
+            android:src="@drawable/ic_play"
+            app:tint="@android:color/white" />
 
         <TextView
             android:id="@+id/current"

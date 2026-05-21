@@ -7,12 +7,15 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.LoadState
 import com.example.bilibili.databinding.FragmentCollectBinding
-import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.bilibili.ui.playVideo.PlayVideoActivity
+import com.example.bilibili.util.PagingUiHelper
 import com.example.bilibili.util.SPUtils
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class CollectFragment : Fragment() {
@@ -23,7 +26,7 @@ class CollectFragment : Fragment() {
     private val viewModel: CollectViewModel by viewModels()
     private lateinit var collectAdapter: CollectAdapter
 
-    private var isFirstLoad = true
+    private var currentUserId: String = ""
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -38,9 +41,8 @@ class CollectFragment : Fragment() {
 
         setupRecyclerView()
 
-        // 设置用户ID
-        val userId = SPUtils.getUserId()
-        viewModel.setUserId(userId)
+        currentUserId = arguments?.getString("user_id") ?: SPUtils.getUserId()
+        viewModel.setUserId(currentUserId)
 
         // 设置下拉刷新
         binding.swipeRefresh.setColorSchemeColors(android.graphics.Color.parseColor("#FB7299"))
@@ -48,10 +50,11 @@ class CollectFragment : Fragment() {
             collectAdapter.refresh()
         }
 
-        // 监听分页数据流
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.collectVideos.collect { pagingData ->
-                collectAdapter.submitData(pagingData)
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.collectVideos.collectLatest { pagingData ->
+                    collectAdapter.submitData(pagingData)
+                }
             }
         }
 
@@ -79,11 +82,10 @@ class CollectFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        // 在Fragment可见时刷新数据
-        if (!isFirstLoad) {
-            collectAdapter.refresh()
-        } else {
-            isFirstLoad = false
+        val newUserId = arguments?.getString("user_id") ?: SPUtils.getUserId()
+        if (newUserId != currentUserId) {
+            currentUserId = newUserId
+            viewModel.setUserId(currentUserId)
         }
     }
 
@@ -95,10 +97,11 @@ class CollectFragment : Fragment() {
             startActivity(intent)
         }
 
-        binding.recyclerView.apply {
-            layoutManager = LinearLayoutManager(requireContext())
-            adapter = collectAdapter
-        }
+        PagingUiHelper.setupListWithLoadStateFooter(
+            recyclerView = binding.recyclerView,
+            contentAdapter = collectAdapter,
+            onRetry = { collectAdapter.retry() }
+        )
     }
 
     override fun onDestroyView() {

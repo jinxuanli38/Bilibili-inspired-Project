@@ -13,9 +13,12 @@ import com.example.bilibili.data.model.CommentDataContainer
 import com.example.bilibili.data.model.CommentItem
 import com.example.bilibili.data.model.DanmuEntity
 import com.example.bilibili.data.model.PreviewConfigEntity
+import com.example.bilibili.ui.playVideo.intro.RecommendVideoItem
 import com.example.bilibili.util.RetrofitClient
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -73,6 +76,82 @@ class PlayVideoViewModel : ViewModel() {
     // 1. 在 PlayVideoViewModel 中新增一个数据发射源
     val previewConfigLive = MutableLiveData<PreviewConfigEntity>()
 
+    /** 推荐视频列表（简介页与播放结束页共用） */
+    val recommendListLive = MutableLiveData<List<RecommendVideoItem>>()
+
+    fun loadRecommendVideos(videoName: String, videoId: String) {
+        if (videoId.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    videoService.getVideoRecommend(videoName, videoId)
+                }
+                val jsonObject = JSONObject(response)
+                if (jsonObject.optString("status") != "success") return@launch
+
+                val dataArray = jsonObject.optJSONArray("data") ?: return@launch
+                val recommendList = mutableListOf<RecommendVideoItem>()
+                for (i in 0 until dataArray.length()) {
+                    val item = dataArray.getJSONObject(i)
+                    val durationFromRecommend = if (item.has("duration")) {
+                        item.optInt("duration").takeIf { it > 0 }
+                    } else {
+                        null
+                    }
+                    recommendList.add(
+                        RecommendVideoItem(
+                            videoId = item.optString("videoId"),
+                            videoName = item.optString("videoName"),
+                            videoCover = item.optString("videoCover"),
+                            nickName = item.optString("nickName"),
+                            userId = item.optString("userId"),
+                            playCount = item.optInt("playCount", 0),
+                            danmuCount = item.optInt("danmuCount", 0),
+                            commentCount = item.optInt("commentCount", 0),
+                            duration = durationFromRecommend
+                        )
+                    )
+                }
+
+                val enrichedList = recommendList.map { video ->
+                    async {
+                        if (video.duration != null) {
+                            video
+                        } else {
+                            val seconds = fetchVideoDurationSeconds(video.videoId)
+                            if (seconds != null) video.copy(duration = seconds) else video
+                        }
+                    }
+                }.awaitAll()
+                recommendListLive.postValue(enrichedList)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                recommendListLive.postValue(emptyList())
+            }
+        }
+    }
+
+    private suspend fun fetchVideoDurationSeconds(videoId: String): Int? {
+        if (videoId.isBlank()) return null
+        return try {
+            val response = videoService.loadVideoPList(videoId)
+            val dataArray = JSONObject(response).optJSONArray("data") ?: return null
+            var totalSeconds = 0
+            var hasDuration = false
+            for (i in 0 until dataArray.length()) {
+                val seconds = dataArray.getJSONObject(i).optInt("duration", 0)
+                if (seconds > 0) {
+                    totalSeconds += seconds
+                    hasDuration = true
+                }
+            }
+            if (hasDuration) totalSeconds else null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     /**
      * 上报视频播放（增加播放量、更新在线人数），需传分P的 fileId 而非 videoId
      */
@@ -109,6 +188,10 @@ class PlayVideoViewModel : ViewModel() {
                     // 发布视频详情数据和用户行为列表
                     videoDetailLive.postValue(videoInfo)
                     userActionsLive.postValue(data.optJSONArray("userActionList"))
+                    loadRecommendVideos(
+                        videoInfo.optString("videoName"),
+                        videoInfo.optString("videoId")
+                    )
 
                     // 提取雪碧图相关设置
                     if (data.has("previewConfig")) {

@@ -98,6 +98,13 @@ class FrontPageFragment : Fragment() {
         loadTabsAndInitViewPager()
     }
 
+    /** 下拉刷新后由子 Fragment 调用，展开顶部搜索栏区域 */
+    fun expandAppBar() {
+        if (_binding != null) {
+            binding.appBarLayout.setExpanded(true, true)
+        }
+    }
+
     private fun initScrollAnimation() {
         binding.appBarLayout.addOnOffsetChangedListener { appBarLayout, verticalOffset ->
             val totalRange = appBarLayout.totalScrollRange

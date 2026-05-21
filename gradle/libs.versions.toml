@@ -60,6 +60,7 @@ androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", 
 androidx-paging-common = { group = "androidx.paging", name = "paging-common", version.ref = "paging" }
 androidx-swiperefreshlayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "swiperefreshlayout" }
 gsyVideoPlayer-carguo = { group = "io.github.carguo", name = "gsyvideoplayer", version.ref = "gsyVideoPlayer" }
+gsyVideoPlayer-exo2 = { group = "io.github.carguo", name = "gsyvideoplayer-exo2", version.ref = "gsyVideoPlayer" }
 danmaku-main = { group = "com.github.ctiao", name = "DanmakuFlameMaster", version.ref = "danmaku" }
 danmaku-ndk = { group = "com.github.ctiao", name = "ndkbitmap-armv7a", version.ref = "danmaku-ndk" }
 google-gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }

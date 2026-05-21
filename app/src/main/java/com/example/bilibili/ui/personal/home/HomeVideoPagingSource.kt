@@ -4,6 +4,7 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.example.bilibili.data.api.PostService
 import com.example.bilibili.data.model.VideoItem
+import com.example.bilibili.util.PagingDefaults
 import com.example.bilibili.util.RetrofitClient
 import org.json.JSONObject
 
@@ -18,7 +19,8 @@ class HomeVideoPagingSource(private val userId: String) : PagingSource<Int, Vide
 
             if (jsonObject.optString("status") == "success") {
                 val list = mutableListOf<VideoItem>()
-                val dataArray = jsonObject.getJSONObject("data").getJSONArray("list")
+                val dataObject = jsonObject.getJSONObject("data")
+                val dataArray = dataObject.getJSONArray("list")
 
                 for (i in 0 until dataArray.length()) {
                     val item = dataArray.getJSONObject(i)
@@ -37,13 +39,10 @@ class HomeVideoPagingSource(private val userId: String) : PagingSource<Int, Vide
                     )
                 }
 
-                val hasMore = list.size >= params.loadSize
-                val nextPage = if (hasMore) page + 1 else null
-
                 LoadResult.Page(
                     data = list,
                     prevKey = if (page == 1) null else page - 1,
-                    nextKey = nextPage
+                    nextKey = PagingDefaults.nextPageKey(dataObject, page, list.size)
                 )
             } else {
                 LoadResult.Error(Exception(jsonObject.optString("message", "加载失败")))

@@ -40,4 +40,13 @@ object PagingUiHelper {
         recyclerView.layoutManager = LinearLayoutManager(recyclerView.context)
         recyclerView.adapter = contentAdapter.withLoadStateFooter(footerAdapter)
     }
+
+    /** 刷新完成后将列表滚回顶部，避免数据已重置但视口仍停在原位置 */
+    fun scrollContentToTop(recyclerView: RecyclerView) {
+        when (val lm = recyclerView.layoutManager) {
+            is GridLayoutManager -> lm.scrollToPositionWithOffset(0, 0)
+            is LinearLayoutManager -> lm.scrollToPositionWithOffset(0, 0)
+            else -> recyclerView.scrollToPosition(0)
+        }
+    }
 }

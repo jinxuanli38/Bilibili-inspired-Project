@@ -3,8 +3,8 @@ package com.example.bilibili.ui.personal.collect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
-import androidx.paging.PagingConfig
 import androidx.paging.cachedIn
+import com.example.bilibili.util.PagingDefaults
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,11 +19,7 @@ class CollectViewModel : ViewModel() {
     val collectVideos: Flow<androidx.paging.PagingData<com.example.bilibili.data.model.CollectVideo>> =
         _userId.flatMapLatest { userId ->
             Pager(
-                config = PagingConfig(
-                    pageSize = 20,
-                    enablePlaceholders = false,
-                    initialLoadSize = 20
-                ),
+                config = PagingDefaults.videoListConfig(),
                 pagingSourceFactory = { CollectPagingSource(userId) }
             ).flow.cachedIn(viewModelScope)
         }

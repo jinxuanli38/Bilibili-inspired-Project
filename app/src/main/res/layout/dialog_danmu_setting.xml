@@ -19,6 +19,9 @@
             android:id="@+id/iv_danmu_style_btn"
             android:layout_width="28dp"
             android:layout_height="28dp"
+            android:clickable="true"
+            android:contentDescription="@string/danmu_style_toggle"
+            android:focusable="true"
             android:src="@drawable/ic_danmu_style_a" />
 
         <EditText
@@ -28,9 +31,14 @@
             android:layout_marginHorizontal="12dp"
             android:layout_weight="1"
             android:background="@drawable/bg_gray_input_field"
+            android:ellipsize="end"
             android:hint="发个友善的弹幕见证当下"
+            android:imeOptions="actionDone"
+            android:inputType="text"
             android:maxLines="1"
             android:paddingHorizontal="16dp"
+            android:scrollHorizontally="true"
+            android:singleLine="true"
             android:textColorHint="#9499A0"
             android:textSize="14sp" />
 

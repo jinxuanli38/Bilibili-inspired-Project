@@ -49,7 +49,7 @@ class FrontPagePagingSource(private val pCategoryId: Int = 0) : PagingSource<Int
                 }
 
                 // 使用后端分页元数据判断下一页（勿用 list.size >= loadSize，后端固定每页 15 条）
-                val nextKey = PagingDefaults.nextPageKey(dataObject, page)
+                val nextKey = PagingDefaults.nextPageKey(dataObject, page, list.size)
 
                 LoadResult.Page(
                     data = list,

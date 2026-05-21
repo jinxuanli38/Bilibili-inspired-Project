@@ -28,8 +28,6 @@
                 android:paddingStart="2dp"
                 android:paddingEnd="2dp"
                 android:paddingBottom="2dp"
-                app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-                app:spanCount="2"
                 tools:listitem="@layout/item_video_card" />
 
             <LinearLayout

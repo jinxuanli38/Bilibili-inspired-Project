@@ -54,11 +54,11 @@ class RecommendVideoAdapter(
 
                 GlideEngine.loadVideoCover(root.context, item.videoCover, ivVideoCover)
 
-                // 时长显示（如果有duration数据）
-                item.duration?.let { duration ->
-                    tvDuration.text = formatDuration(duration)
+                val durationSeconds = item.duration
+                if (durationSeconds != null && durationSeconds > 0) {
+                    tvDuration.text = VideoDataUtils.formatDuration(durationSeconds)
                     tvDuration.visibility = android.view.View.VISIBLE
-                } ?: run {
+                } else {
                     tvDuration.visibility = android.view.View.GONE
                 }
 
@@ -66,11 +66,6 @@ class RecommendVideoAdapter(
             }
         }
 
-        private fun formatDuration(seconds: Int): String {
-            val minutes = seconds / 60
-            val remainingSeconds = seconds % 60
-            return String.format("%02d:%02d", minutes, remainingSeconds)
-        }
     }
 }
 

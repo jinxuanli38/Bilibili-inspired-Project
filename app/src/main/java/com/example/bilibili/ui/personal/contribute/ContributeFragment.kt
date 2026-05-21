@@ -8,11 +8,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.LoadState
 import com.example.bilibili.databinding.FragmentContributeBinding
 import com.example.bilibili.ui.playVideo.PlayVideoActivity
+import com.example.bilibili.util.PagingUiHelper
 import com.example.bilibili.util.SPUtils
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class ContributeFragment : Fragment() {
@@ -23,7 +27,6 @@ class ContributeFragment : Fragment() {
     private lateinit var adapter: ContributeVideoAdapter
 
     private var currentOrderType = 0
-    private var isFirstLoad = true
     private var currentUserId: String = ""
     private var shouldScrollToTop = false
 
@@ -52,17 +55,11 @@ class ContributeFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        // 在Fragment可见时检查并刷新数据
         val newUserId = arguments?.getString("user_id") ?: SPUtils.getUserId()
-
-        // 如果用户ID发生变化，重新设置并刷新数据
         if (newUserId != currentUserId) {
             currentUserId = newUserId
             viewModel.setParams(currentUserId, currentOrderType)
         }
-
-        // 总是刷新数据，确保获取最新内容
-        adapter.refresh()
     }
 
     private fun setupSwipeRefresh() {
@@ -79,7 +76,11 @@ class ContributeFragment : Fragment() {
             }
             startActivity(intent)
         }
-        binding.rvVideoList.adapter = adapter
+        PagingUiHelper.setupListWithLoadStateFooter(
+            recyclerView = binding.rvVideoList,
+            contentAdapter = adapter,
+            onRetry = { adapter.retry() }
+        )
     }
 
     private fun setupSortClick() {
@@ -94,21 +95,17 @@ class ContributeFragment : Fragment() {
                 2 -> binding.NewText.text = "最多收藏"
             }
 
-            // 更新ViewModel参数并刷新数据
             viewModel.setParams(currentUserId, currentOrderType)
-
-            // 标记需要滚动到顶部
             shouldScrollToTop = true
-
-            // 然后刷新数据
-            adapter.refresh()
         }
     }
 
     private fun observeData() {
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.videoList.collect { pagingData ->
-                adapter.submitData(pagingData)
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.videoList.collectLatest { pagingData ->
+                    adapter.submitData(pagingData)
+                }
             }
         }
 

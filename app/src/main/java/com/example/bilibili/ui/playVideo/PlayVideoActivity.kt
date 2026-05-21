@@ -7,6 +7,8 @@ import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.Html
+import android.widget.TextView
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
@@ -14,6 +16,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.animation.AccelerateDecelerateInterpolator
+import android.text.InputFilter
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
 import androidx.activity.enableEdgeToEdge
@@ -36,14 +39,16 @@ import com.example.bilibili.databinding.ActivityPlayVideoBinding
 import com.example.bilibili.databinding.DialogDanmuSettingBinding
 import com.example.bilibili.ui.playVideo.comment.VideoCommentFragment
 import com.example.bilibili.ui.playVideo.danmu.DanmuColorAdapter
+import com.example.bilibili.ui.playVideo.intro.RecommendVideoItem
 import com.example.bilibili.ui.playVideo.intro.VideoIntroFragment
+import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.ToastUtils
+import com.example.bilibili.util.VideoDataUtils
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import com.shuyu.gsyvideoplayer.GSYVideoManager.releaseAllVideos
 import com.shuyu.gsyvideoplayer.utils.CommonUtil
-import com.shuyu.gsyvideoplayer.utils.OrientationUtils
 import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
 
 class PlayVideoActivity : AppCompatActivity() {
@@ -51,8 +56,6 @@ class PlayVideoActivity : AppCompatActivity() {
     private lateinit var binding: ActivityPlayVideoBinding
 
     private val viewModel: PlayVideoViewModel by viewModels()
-
-    private lateinit var orientationUtils: OrientationUtils
 
     private lateinit var currentFileId: String
 
@@ -87,6 +90,8 @@ class PlayVideoActivity : AppCompatActivity() {
     private var danmakuUiEnabled = true
 
     private var danmuExpandAnimator: ValueAnimator? = null
+
+    private var endRecommendItem: RecommendVideoItem? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -134,25 +139,110 @@ class PlayVideoActivity : AppCompatActivity() {
             ToastUtils.showShort(this, "视频 ID 缺失")
         }
 
-        // 返回按钮逻辑
         binding.ivStickyBack.setOnClickListener { finish() }
+        setupStickyBackWithPlayerControls()
 
         initDanmuSwitch()
 
-        // 初始化方向工具类
-        orientationUtils = OrientationUtils(this, binding.videoPlayer)
-        // 设置全屏按钮是否跟随旋转
-        orientationUtils.isEnable = true
-
-        // 核心：给全屏按钮设置点击事件
+        // 全屏：仅窗口内放大，不旋转到横屏
         binding.videoPlayer.fullscreenButton.setOnClickListener {
-            // 直接触发旋转并进入全屏模式
-            orientationUtils.resolveByClick()
-            // 开启全屏窗口
+            binding.ivStickyBack.visibility = View.GONE
             binding.videoPlayer.startWindowFullscreen(this, true, true)
         }
 
         setupPreviewSeekListener()
+        setupPlaybackEndScreen()
+    }
+
+    /** 与播放器控制栏同步显隐；全屏时隐藏（全屏页自带返回）；结束页常显 */
+    private fun setupStickyBackWithPlayerControls() {
+        binding.ivStickyBack.visibility = View.GONE
+        binding.videoPlayer.setOnControlBarVisibilityListener { controlsVisible ->
+            binding.ivStickyBack.visibility = when {
+                binding.videoPlayer.isEndScreenShowing -> View.VISIBLE
+                binding.videoPlayer.isIfCurrentIsFullscreen -> View.GONE
+                controlsVisible -> View.VISIBLE
+                else -> View.GONE
+            }
+        }
+    }
+
+    private fun setupPlaybackEndScreen() {
+        val player = binding.videoPlayer
+
+        player.setOnPlaybackEndListener {
+            binding.ivStickyBack.visibility = View.VISIBLE
+            bindEndRecommendCard(endRecommendItem)
+        }
+
+        player.findViewById<View>(R.id.layout_end_recommend_card)?.setOnClickListener {
+            val item = endRecommendItem ?: return@setOnClickListener
+            if (item.videoId.isBlank()) return@setOnClickListener
+            startActivity(
+                Intent(this, PlayVideoActivity::class.java).apply {
+                    putExtra("video_id", item.videoId)
+                }
+            )
+        }
+
+        player.findViewById<View>(R.id.btn_end_replay)?.setOnClickListener {
+            player.replayFromBeginning()
+            binding.ivStickyBack.visibility = View.GONE
+        }
+
+        viewModel.recommendListLive.observe(this) { list ->
+            endRecommendItem = list.firstOrNull()
+            if (player.isEndScreenShowing) {
+                bindEndRecommendCard(endRecommendItem)
+            }
+        }
+    }
+
+    private fun bindEndRecommendCard(item: RecommendVideoItem?) {
+        val player = binding.videoPlayer
+        val card = player.findViewById<View>(R.id.layout_end_recommend_card) ?: return
+
+        if (item == null) {
+            card.visibility = View.GONE
+            return
+        }
+        card.visibility = View.VISIBLE
+
+        val titleView = player.findViewById<TextView>(R.id.tv_end_video_title)
+        val uploaderView = player.findViewById<TextView>(R.id.tv_end_uploader)
+        val playCountView = player.findViewById<TextView>(R.id.tv_end_play_count)
+        val commentCountView = player.findViewById<TextView>(R.id.tv_end_comment_count)
+        val durationView = player.findViewById<TextView>(R.id.tv_end_duration)
+        val coverView = player.findViewById<ImageView>(R.id.iv_end_cover)
+
+        val rawTitle = item.videoName ?: ""
+        val formattedTitle = rawTitle
+            .replace("<span class='highlight'>", "<font color='#FB7299'>")
+            .replace("</span>", "</font>")
+        titleView.text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            Html.fromHtml(formattedTitle, Html.FROM_HTML_MODE_LEGACY)
+        } else {
+            @Suppress("DEPRECATION")
+            Html.fromHtml(formattedTitle)
+        }
+
+        uploaderView.text = item.nickName
+        playCountView.text = VideoDataUtils.formatCount(item.playCount)
+        commentCountView.text = VideoDataUtils.formatCount(item.commentCount)
+
+        val durationSeconds = item.duration
+        if (durationSeconds != null && durationSeconds > 0) {
+            durationView.text = VideoDataUtils.formatDuration(durationSeconds)
+            durationView.visibility = View.VISIBLE
+        } else {
+            durationView.visibility = View.GONE
+        }
+
+        GlideEngine.loadVideoCover(this, item.videoCover, coverView)
+    }
+
+    private fun hidePlaybackEndScreen() {
+        binding.videoPlayer.hideEndOverlay()
     }
 
     /** 不要覆盖 GSY 的 SeekBar 监听器；通过播放器回调统一处理预览 */
@@ -276,6 +366,56 @@ class PlayVideoActivity : AppCompatActivity() {
         val dialogBinding = DialogDanmuSettingBinding.inflate(layoutInflater)
         bottomSheetDialog.setContentView(dialogBinding.root)
 
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        var isStylePanelMode = false
+
+        dialogBinding.etDanmuMessage.filters = arrayOf(
+            InputFilter { source, _, _, _, _, _ ->
+                source.toString().replace("\n", "")
+            }
+        )
+
+        fun showInputMode(showKeyboard: Boolean = true) {
+            isStylePanelMode = false
+            dialogBinding.ivDanmuStyleBtn.setImageResource(R.drawable.ic_danmu_style_a)
+            if (showKeyboard) {
+                dialogBinding.etDanmuMessage.requestFocus()
+                dialogBinding.etDanmuMessage.post {
+                    imm.showSoftInput(
+                        dialogBinding.etDanmuMessage,
+                        InputMethodManager.SHOW_IMPLICIT
+                    )
+                }
+            }
+        }
+
+        fun showStylePanelMode() {
+            isStylePanelMode = true
+            dialogBinding.ivDanmuStyleBtn.setImageResource(R.drawable.ic_danmu_style_p)
+            dialogBinding.etDanmuMessage.clearFocus()
+            imm.hideSoftInputFromWindow(dialogBinding.etDanmuMessage.windowToken, 0)
+        }
+
+        dialogBinding.ivDanmuStyleBtn.setOnClickListener {
+            if (isStylePanelMode) {
+                showInputMode()
+            } else {
+                showStylePanelMode()
+            }
+        }
+
+        dialogBinding.etDanmuMessage.setOnClickListener {
+            if (isStylePanelMode) {
+                showInputMode()
+            }
+        }
+
+        dialogBinding.etDanmuMessage.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus && isStylePanelMode) {
+                showInputMode()
+            }
+        }
+
         val colorAdapter = DanmuColorAdapter { color ->
             // 暂时不需要预览
         }
@@ -326,20 +466,13 @@ class PlayVideoActivity : AppCompatActivity() {
             // 发送到服务端进行存储
             viewModel.sendDanmu(entity)
 
-            // 隐藏键盘
-            val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
             imm.hideSoftInputFromWindow(dialogBinding.etDanmuMessage.windowToken, 0)
 
             bottomSheetDialog.dismiss()
         }
 
-        // 延迟200ms执行
         dialogBinding.etDanmuMessage.postDelayed({
-            // 1. 获取焦点
-            dialogBinding.etDanmuMessage.requestFocus()
-            // 2. 弹出键盘
-            val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-            imm.showSoftInput(dialogBinding.etDanmuMessage, InputMethodManager.SHOW_IMPLICIT)
+            showInputMode()
         }, 200)
 
         bottomSheetDialog.show()
@@ -534,6 +667,7 @@ class PlayVideoActivity : AppCompatActivity() {
      * 初始化 GSYVideoPlayer
      */
     private fun initPlayer(url: String, title: String, seekMs: Long = 0L) {
+        hidePlaybackEndScreen()
         binding.videoPlayer.onVideoReset()
 
         binding.videoPlayer.setUp(url, true, null)
@@ -627,11 +761,6 @@ class PlayVideoActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         danmuExpandAnimator?.cancel()
-
-        // 彻底释放屏幕旋转工具类，防止严重的内存泄漏和传感器死锁
-        if (::orientationUtils.isInitialized) {
-            orientationUtils.releaseListener()
-        }
 
         previewSpriteBitmap = null
 

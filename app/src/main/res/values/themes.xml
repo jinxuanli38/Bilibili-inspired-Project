@@ -7,6 +7,10 @@
 
     <style name="Theme.Bilibili" parent="Theme.AppCompat.Light.NoActionBar" />
 
+    <style name="Theme.Bilibili.Splash" parent="Theme.Bilibili">
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
+
     <style name="BottomBarTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="colorSecondaryContainer">@android:color/transparent</item>
         <item name="colorPrimary">#FB7299</item>

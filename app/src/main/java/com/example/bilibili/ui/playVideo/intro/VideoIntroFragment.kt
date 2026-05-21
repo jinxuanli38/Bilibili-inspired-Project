@@ -24,7 +24,6 @@ import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.SPUtils
 import com.example.bilibili.data.api.VideoService
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.CoroutineScope
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -82,6 +81,11 @@ class VideoIntroFragment : Fragment() {
             if (!fileId.isNullOrEmpty()) {
                 startOnlinePolling(fileId)
             }
+        }
+
+        // 6. 推荐视频（与播放结束页共用 ViewModel 数据）
+        sharedViewModel.recommendListLive.observe(viewLifecycleOwner) { list ->
+            recommendAdapter?.submitList(list)
         }
 
     }
@@ -156,10 +160,6 @@ class VideoIntroFragment : Fragment() {
 
             tvVideoId.text = "ID: $videoId"
             tvVideoIntroduction.text = info.optString("introduction")
-
-            // 加载推荐视频
-            val videoName = info.optString("videoName")
-            loadRecommendVideos(videoName, videoId)
 
             cgTags.removeAllViews() // 刷新前先清空旧标签，防止页面滑动导致数据错乱叠加
             val tagsString = info.optString("tags")
@@ -299,49 +299,6 @@ class VideoIntroFragment : Fragment() {
         binding.rvRecommend.layoutManager = LinearLayoutManager(context)
         binding.rvRecommend.isNestedScrollingEnabled = false
         binding.rvRecommend.adapter = recommendAdapter
-    }
-
-    /**
-     * 加载推荐视频
-     */
-    private fun loadRecommendVideos(videoName: String, videoId: String) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val videoService = RetrofitClient.create(VideoService::class.java)
-                val response = withContext(Dispatchers.IO) {
-                    videoService.getVideoRecommend(videoName, videoId)
-                }
-
-                val jsonObject = JSONObject(response)
-                if (jsonObject.optString("status") == "success") {
-                    val dataArray = jsonObject.optJSONArray("data")
-                    val recommendList = mutableListOf<RecommendVideoItem>()
-
-                    if (dataArray != null) {
-                        for (i in 0 until dataArray.length()) {
-                            val item = dataArray.getJSONObject(i)
-                            recommendList.add(
-                                RecommendVideoItem(
-                                    videoId = item.optString("videoId"),
-                                    videoName = item.optString("videoName"),
-                                    videoCover = item.optString("videoCover"),
-                                    nickName = item.optString("nickName"),
-                                    userId = item.optString("userId"),
-                                    playCount = item.optInt("playCount", 0),
-                                    danmuCount = item.optInt("danmuCount", 0),
-                                    commentCount = item.optInt("commentCount", 0),
-                                    duration = item.optInt("duration")
-                                )
-                            )
-                        }
-                    }
-
-                    recommendAdapter?.submitList(recommendList)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
     }
 
     private fun animateExpand(expand: Boolean) {

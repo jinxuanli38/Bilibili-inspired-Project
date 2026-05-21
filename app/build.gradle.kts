@@ -80,5 +80,6 @@ dependencies {
     implementation(libs.danmaku.main)
     implementation(libs.danmaku.ndk)
     implementation(libs.gsyVideoPlayer.carguo)
+    implementation(libs.gsyVideoPlayer.exo2)
     implementation(libs.google.gson)
 }

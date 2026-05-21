@@ -4,12 +4,14 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.LoadState
 import com.example.bilibili.databinding.FragmentCategoryVideoBinding
 import com.example.bilibili.util.PagingUiHelper
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class CategoryVideoFragment : Fragment() {
@@ -22,7 +24,7 @@ class CategoryVideoFragment : Fragment() {
     }
 
     private lateinit var videoAdapter: VideoAdapter
-    private var dataCollectionJob: Job? = null
+    private var scrollToTopAfterRefresh = false
 
     companion object {
         private const val ARG_CATEGORY_ID = "category_id"
@@ -65,51 +67,48 @@ class CategoryVideoFragment : Fragment() {
         // 设置下拉刷新
         binding.swipeRefreshLayout.setColorSchemeColors(android.graphics.Color.parseColor("#FB7299"))
         binding.swipeRefreshLayout.setOnRefreshListener {
+            scrollToTopAfterRefresh = true
             videoAdapter.refresh()
         }
 
-        // 收集视频列表数据
-        collectVideoList()
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.videoList.collectLatest { pagingData ->
+                    videoAdapter.submitData(pagingData)
+                }
+            }
+        }
 
-        // 监听加载状态
         viewLifecycleOwner.lifecycleScope.launch {
             videoAdapter.loadStateFlow.collect { loadState ->
-                // 只有在 refresh 状态下才显示下拉刷新
                 binding.swipeRefreshLayout.isRefreshing = loadState.refresh is LoadState.Loading
 
-                // 处理空数据显示
                 val isEmpty = videoAdapter.itemCount == 0 && loadState.refresh !is LoadState.Loading
                 binding.llEmpty.visibility = if (isEmpty) View.VISIBLE else View.GONE
                 binding.recyclerView.visibility = if (isEmpty) View.GONE else View.VISIBLE
 
-                // 处理错误情况
                 if (loadState.refresh is LoadState.Error) {
                     val error = (loadState.refresh as LoadState.Error).error
                     Log.e("CategoryVideoFragment", "加载失败: ${error.message}")
-                    // 确保错误时关闭刷新状态
                     binding.swipeRefreshLayout.isRefreshing = false
+                    scrollToTopAfterRefresh = false
                 }
 
-                // 调试信息
-                Log.d("CategoryVideoFragment", "LoadState: refresh=${loadState.refresh}, append=${loadState.append}, prepend=${loadState.prepend}")
-            }
-        }
-    }
-
-    private fun collectVideoList() {
-        // 取消之前的数据收集
-        dataCollectionJob?.cancel()
-        // 启动新的数据收集
-        dataCollectionJob = viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.videoList.collect { pagingData ->
-                videoAdapter.submitData(pagingData)
+                // 刷新完成：数据已从第 1 页重载，必须把列表视口也滚回顶部
+                if (scrollToTopAfterRefresh && loadState.refresh is LoadState.NotLoading) {
+                    scrollToTopAfterRefresh = false
+                    binding.recyclerView.post {
+                        PagingUiHelper.scrollContentToTop(binding.recyclerView)
+                        (parentFragment as? FrontPageFragment)?.expandAppBar()
+                    }
+                }
             }
         }
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        dataCollectionJob?.cancel()
+        scrollToTopAfterRefresh = false
         _binding = null
     }
 }

@@ -4,6 +4,7 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.example.bilibili.data.api.PostService
 import com.example.bilibili.data.model.CollectVideo
+import com.example.bilibili.util.PagingDefaults
 import com.example.bilibili.util.RetrofitClient
 import org.json.JSONObject
 
@@ -39,13 +40,10 @@ class CollectPagingSource(private val userId: String) : PagingSource<Int, Collec
                     )
                 }
 
-                val hasMore = list.size >= params.loadSize
-                val nextPage = if (hasMore) page + 1 else null
-
                 LoadResult.Page(
                     data = list,
                     prevKey = if (page == 1) null else page - 1,
-                    nextKey = nextPage
+                    nextKey = PagingDefaults.nextPageKey(dataObj, page, list.size)
                 )
             } else {
                 LoadResult.Error(Exception(jsonObject.optString("message", "加载失败")))

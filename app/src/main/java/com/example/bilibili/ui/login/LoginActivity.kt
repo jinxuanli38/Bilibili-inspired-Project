@@ -41,9 +41,6 @@ class LoginActivity : AppCompatActivity() {
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 调用自动登录网络请求
-        autologin()
-
         // 跳转到注册按钮监听
         binding.jumpToRegister.setOnClickListener {
             val intent = Intent(this, RegisterActivity::class.java)
@@ -217,40 +214,6 @@ class LoginActivity : AppCompatActivity() {
         // 更新按钮状态
         binding.btnLogin.isEnabled = isAllFilled
 
-    }
-
-    /**
-     * 自动登录
-     */
-    private fun autologin() {
-        // 如果token为空说明未登录
-        val token = SPUtils.getToken()
-        if (token.isEmpty()) {
-            return
-        }
-        lifecycleScope.launch {
-            try {
-                val accountService = RetrofitClient.create(AccountService::class.java)
-                val response = JSONObject(accountService.autoLogin(token))
-
-                val resToken = response.getJSONObject("data").getString("token")
-                if (resToken != token) {
-                    // 说明token快过期了，先存放到本地sp
-                    SPUtils.saveToken(resToken)
-                }
-
-                // 同时直接跳转到主页
-                val intent = Intent(this@LoginActivity, MainActivity::class.java)
-                startActivity(intent)
-                finish()
-
-            } catch (e: Exception) {
-                e.printStackTrace()
-                // 自动登录失败，清除无效的token
-                SPUtils.cleanToken()
-                ToastUtils.showShort(this@LoginActivity,"登录已过期，请重新登录")
-            }
-        }
     }
 
     /**

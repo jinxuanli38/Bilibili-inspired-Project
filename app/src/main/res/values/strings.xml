@@ -1,5 +1,7 @@
 <resources>
-    <string name="app_name">bilibili</string>
+    <string name="app_name">劈哩劈哩</string>
+    <string name="splash_brand_name">劈哩劈哩</string>
+    <string name="splash_content_desc">启动页封面</string>
     <string name="account_password_login">账号密码登录</string>
     <string name="account_register">账号注册</string>
     <string name="email">邮箱</string>
@@ -25,5 +27,6 @@
     <string name="publish_protocol">我已阅读并接受《哔哩哔哩社区公约》</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="danmu_style_toggle">切换弹幕样式</string>
     <string name="appbar_scrolling_view_behavior">com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior</string>
 </resources>

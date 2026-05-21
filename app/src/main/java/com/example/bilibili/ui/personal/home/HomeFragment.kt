@@ -7,11 +7,15 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.LoadState
 import com.example.bilibili.databinding.FragmentHomeBinding
 import com.example.bilibili.ui.playVideo.PlayVideoActivity
+import com.example.bilibili.util.PagingUiHelper
 import com.example.bilibili.util.SPUtils
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class HomeFragment : Fragment() {
@@ -29,7 +33,6 @@ class HomeFragment : Fragment() {
         return binding.root
     }
 
-    private var isFirstLoad = true
     private var currentUserId: String = ""
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -43,7 +46,12 @@ class HomeFragment : Fragment() {
             startActivity(intent)
         }
 
-        binding.rvHomeVideo.adapter = videoAdapter
+        PagingUiHelper.setupGridWithLoadStateFooter(
+            recyclerView = binding.rvHomeVideo,
+            spanCount = 2,
+            contentAdapter = videoAdapter,
+            onRetry = { videoAdapter.retry() }
+        )
 
         // 设置用户ID - 优先使用传入的参数，否则使用当前登录用户ID
         currentUserId = arguments?.getString("user_id") ?: SPUtils.getUserId()
@@ -64,10 +72,12 @@ class HomeFragment : Fragment() {
             videoAdapter.refresh()
         }
 
-        // 监听分页数据流
+        // 监听分页数据流（collectLatest 避免刷新时旧数据覆盖新数据）
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.videoList.collect { pagingData ->
-                videoAdapter.submitData(pagingData)
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.videoList.collectLatest { pagingData ->
+                    videoAdapter.submitData(pagingData)
+                }
             }
         }
 
@@ -95,17 +105,11 @@ class HomeFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        // 在Fragment可见时检查并刷新数据
         val newUserId = arguments?.getString("user_id") ?: SPUtils.getUserId()
-
-        // 如果用户ID发生变化，重新设置
         if (newUserId != currentUserId) {
             currentUserId = newUserId
             viewModel.setUserId(currentUserId)
         }
-
-        // 总是刷新数据，确保获取最新内容
-        videoAdapter.refresh()
     }
 
     override fun onDestroyView() {
