@@ -47,6 +47,7 @@ class PlayVideoViewModel : ViewModel() {
 
     // 状态：关注状态（用于 Fragment 实时反馈）
     val isFollowedLive = MutableLiveData<Boolean>()
+    val focusTypeLive = MutableLiveData<Int>(0)
 
     // 状态：错误消息
     val errorLive = MutableLiveData<String>()
@@ -236,7 +237,17 @@ class PlayVideoViewModel : ViewModel() {
                     val userData = JSONObject(uRes).getJSONObject("data")
 
                     authorLive.postValue(userData)
-                    isFollowedLive.postValue(userData.optBoolean("haveFocus"))
+                    val haveFocus = userData.optBoolean("haveFocus")
+                    isFollowedLive.postValue(haveFocus)
+                    focusTypeLive.postValue(
+                        if (userData.has("focusType")) {
+                            userData.optInt("focusType", 0)
+                        } else if (haveFocus) {
+                            2
+                        } else {
+                            0
+                        },
+                    )
 
                     // 解析播放地址
                     val dataArray = JSONObject(pListRes).getJSONArray("data")
@@ -271,10 +282,12 @@ class PlayVideoViewModel : ViewModel() {
      */
     fun toggleFollow(authorId: String) {
         val currentState = isFollowedLive.value ?: false
+        val currentType = focusTypeLive.value ?: 0
         val newState = !currentState
+        val newType = if (newState) 2 else 0
 
-        // 乐观更新 UI
         isFollowedLive.value = newState
+        focusTypeLive.value = newType
 
         viewModelScope.launch {
             try {
@@ -283,8 +296,8 @@ class PlayVideoViewModel : ViewModel() {
                     else postService.cancelFocus(authorId)
                 }
             } catch (_: Exception) {
-                // 失败回滚
                 isFollowedLive.postValue(currentState)
+                focusTypeLive.postValue(currentType)
                 errorLive.postValue("操作失败，请检查网络")
             }
         }

@@ -1,6 +1,5 @@
 package com.example.bilibili.ui.playVideo
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable

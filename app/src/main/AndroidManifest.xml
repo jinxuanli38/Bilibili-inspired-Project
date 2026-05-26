@@ -68,6 +68,22 @@
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity
+            android:name=".ui.friends.MyFriendsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.creator.CreatorVideoManageActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.creator.CreatorCommentManageActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.creator.CreatorDanmuManageActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".ui.splash.SplashActivity"
             android:exported="true"
             android:screenOrientation="portrait"
@@ -87,6 +103,10 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.Bilibili" />
+        <activity
+            android:name=".ui.message.MessageCategoryActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
     </application>
 
 </manifest>

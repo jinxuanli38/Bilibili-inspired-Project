@@ -7,9 +7,7 @@ import androidx.fragment.app.Fragment
 import android.view.View
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.example.bilibili.data.api.VideoService
 import com.example.bilibili.data.local.AppDatabase

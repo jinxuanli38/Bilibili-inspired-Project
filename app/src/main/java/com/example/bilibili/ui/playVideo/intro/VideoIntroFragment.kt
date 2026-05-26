@@ -19,6 +19,7 @@ import com.example.bilibili.databinding.FragmentVideoIntroBinding
 import com.example.bilibili.ui.playVideo.PlayVideoViewModel
 import com.example.bilibili.ui.user.UserProfileActivity
 import com.example.bilibili.util.DeviceIdHelper
+import com.example.bilibili.util.FollowActionButtonUi
 import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.SPUtils
@@ -73,7 +74,13 @@ class VideoIntroFragment : Fragment() {
 
         // 4. 监听关注状态 (ViewModel 独立维护这个状态)
         sharedViewModel.isFollowedLive.observe(viewLifecycleOwner) { followed ->
-            updateFollowUI(followed)
+            val type = sharedViewModel.focusTypeLive.value ?: 0
+            updateFollowUI(followed, type)
+        }
+        sharedViewModel.focusTypeLive.observe(viewLifecycleOwner) { type ->
+            if (sharedViewModel.isFollowedLive.value == true) {
+                updateFollowUI(true, type)
+            }
         }
 
         // 5. fileId 就绪后开始上报（接口参数是 fileId，不是 videoId）
@@ -270,11 +277,16 @@ class VideoIntroFragment : Fragment() {
     /**
      * UI 辅助：更新关注按钮样式
      */
-    private fun updateFollowUI(followed: Boolean) {
+    private fun updateFollowUI(followed: Boolean, focusType: Int) {
         binding.btnFollow.apply {
-            text = if (followed) "已关注" else "+ 关注"
-            setTextColor(if (followed) Color.parseColor("#999999") else Color.WHITE)
-            setBackgroundResource(if (followed) R.drawable.bg_followed_button else R.drawable.bg_follow_button)
+            if (followed) {
+                FollowActionButtonUi.bind(this, focusType)
+            } else {
+                text = "+ 关注"
+                setCompoundDrawablesRelative(null, null, null, null)
+                setTextColor(Color.WHITE)
+                setBackgroundResource(R.drawable.bg_follow_button)
+            }
         }
     }
 

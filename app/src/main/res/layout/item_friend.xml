@@ -3,9 +3,11 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="84dp"
+    android:layout_height="wrap_content"
     android:background="@color/white"
-    android:paddingHorizontal="16dp">
+    android:minHeight="72dp"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="1dp">
 
     <com.google.android.material.imageview.ShapeableImageView
         android:id="@+id/iv_avatar"
@@ -19,10 +21,11 @@
         tools:src="@tools:sample/avatars" />
 
     <LinearLayout
+        android:id="@+id/msg"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="14dp"
-        android:layout_marginEnd="12dp"
+        android:layout_marginEnd="8dp"
         android:orientation="vertical"
         app:layout_constraintBottom_toBottomOf="@id/iv_avatar"
         app:layout_constraintEnd_toStartOf="@id/btn_follow_action"
@@ -33,34 +36,59 @@
             android:id="@+id/tv_nickname"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="愿达彼岸"
             android:textColor="#212121"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            tools:text="愿达彼岸" />
 
         <TextView
             android:id="@+id/tv_description"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="1021粉丝 25视频"
             android:textColor="#999999"
-            android:textSize="13sp" />
+            android:textSize="13sp"
+            tools:text="1021粉丝 25视频" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/btn_follow_action"
         android:layout_width="wrap_content"
-        android:layout_height="28dp"
+        android:layout_height="32dp"
         android:background="@drawable/shape_follow_btn_pink"
         android:drawablePadding="4dp"
+        android:elevation="0dp"
         android:gravity="center"
         android:minWidth="72dp"
         android:paddingHorizontal="10dp"
+        android:stateListAnimator="@null"
         android:text="回关"
         android:textColor="#FB7299"
         android:textSize="13sp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/iv_more"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageView
+        android:id="@+id/iv_more"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:contentDescription="@null"
+        android:padding="6dp"
+        android:src="@drawable/ic_more_vert"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="#999999"
+        tools:visibility="visible" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0.5dp"
+        android:layout_marginTop="20dp"
+        android:background="#F0F0F0"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/msg"
+        app:layout_constraintTop_toBottomOf="@id/msg" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

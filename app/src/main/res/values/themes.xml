@@ -56,6 +56,10 @@
         <item name="cornerSize">50%</item>
     </style>
 
+    <style name="RoundedImage4">
+        <item name="cornerSize">4dp</item>
+    </style>
+
     <style name="UserStatItemStyle">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">wrap_content</item>

@@ -1,0 +1,19 @@
+<!-- 在 UserFocusMapper.xml 的 selectList 中，
+     找到 focusType 子查询那一行，在其后的 </if>（关闭 query.queryType != null）之前插入： -->
+
+            <if test="query.queryType == 1">
+                ,(select count(1) from user_focus f2 where f2.focus_user_id = i.user_id) otherFansCount
+                ,(select count(1) from video_info vi where vi.user_id = i.user_id) otherVideoCount
+            </if>
+
+<!-- 修改后，该段结构应类似： -->
+<!--
+        <if test="query.queryType != null">
+            ,i.nick_name otherNickName, ...
+            ,(select ... ) focusType
+            <if test="query.queryType == 1">
+                ,(select ... ) otherFansCount
+                ,(select ... ) otherVideoCount
+            </if>
+        </if>
+-->

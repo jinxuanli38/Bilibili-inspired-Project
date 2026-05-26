@@ -118,8 +118,11 @@
         android:layout_marginTop="12dp"
         android:layout_marginEnd="16dp"
         android:background="@drawable/bg_pink_border"
+        android:backgroundTint="@null"
+        android:elevation="0dp"
         android:gravity="center"
-        android:padding="0dp"
+        android:paddingHorizontal="0dp"
+        android:stateListAnimator="@null"
         android:text="关注"
         android:textColor="#FB7299"
         android:textSize="13sp"
@@ -154,13 +157,77 @@
         app:layout_constraintStart_toStartOf="@id/tv_nickname"
         app:layout_constraintTop_toBottomOf="@id/tv_nickname" />
 
+    <LinearLayout
+        android:id="@+id/row_school"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/tv_nickname"
+        app:layout_constraintTop_toBottomOf="@id/tv_description">
+
+        <ImageView
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_school"
+            app:tint="#999999" />
+
+        <TextView
+            android:id="@+id/tv_school"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#999999"
+            android:textSize="13sp"
+            tools:text="新乡职业技术学院" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/row_uid"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingVertical="2dp"
+        app:layout_constraintStart_toStartOf="@id/tv_nickname"
+        app:layout_constraintTop_toBottomOf="@id/row_school">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_profile_meta_label"
+            android:paddingHorizontal="3dp"
+            android:paddingVertical="1dp"
+            android:text="UID"
+            android:textColor="#999999"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/tv_uid"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:textColor="#999999"
+            android:textSize="13sp"
+            tools:text="1636906786" />
+    </LinearLayout>
+
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tab_layout"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_marginTop="16dp"
         android:background="@color/white"
-        app:layout_constraintTop_toBottomOf="@id/tv_description"
+        app:layout_constraintTop_toBottomOf="@id/row_uid"
         app:tabIndicatorColor="#FB7299"
         app:tabIndicatorFullWidth="false"
         app:tabIndicatorHeight="2.5dp"

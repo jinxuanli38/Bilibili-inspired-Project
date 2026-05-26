@@ -1,6 +1,9 @@
 package com.example.bilibili.ui.personal
 
 import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -16,11 +19,13 @@ import com.example.bilibili.R
 import com.example.bilibili.data.api.PostService
 import com.example.bilibili.databinding.FragmentPersonalBinding
 import com.example.bilibili.ui.edit.EditActivity
+import com.example.bilibili.ui.friends.MyFriendsActivity
 import com.example.bilibili.ui.login.LoginActivity
 import com.example.bilibili.ui.personal.collect.CollectFragment
 import com.example.bilibili.ui.personal.contribute.ContributeFragment
 import com.example.bilibili.ui.personal.home.HomeFragment
 import com.example.bilibili.util.GlideEngine
+import com.example.bilibili.util.ToastUtils
 import com.example.bilibili.util.UserInfoText
 import com.example.bilibili.util.optNormalizedString
 import com.example.bilibili.util.RetrofitClient
@@ -36,6 +41,7 @@ class PersonalFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val tabTitles = listOf("主页", "投稿", "收藏")
+    private var currentUserId: String = ""
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -85,14 +91,16 @@ class PersonalFragment : Fragment() {
                         tvDescription.text = UserInfoText.displayIntroduction(
                             data.optNormalizedString("personalIntroduction")
                         )
+                        val school = data.optNormalizedString("school")
+                        tvSchool.text = UserInfoText.displaySchool(school)
+                        currentUserId = data.optString("userId", SPUtils.getUserId())
+                        tvUid.text = currentUserId
                         SPUtils.savePersonalIntroduction(
                             UserInfoText.storageIntroduction(
                                 data.optNormalizedString("personalIntroduction")
                             )
                         )
-                        SPUtils.saveSchool(
-                            UserInfoText.storageSchool(data.optNormalizedString("school"))
-                        )
+                        SPUtils.saveSchool(UserInfoText.storageSchool(school))
                         SPUtils.saveBirthday(data.optNormalizedString("birthday"))
                     }
                 }
@@ -104,14 +112,52 @@ class PersonalFragment : Fragment() {
         }
 
         binding.btnLogout.setOnClickListener {
-            // 跳转到编辑资料页面
-            val intent = Intent(requireContext(), EditActivity::class.java)
-            startActivity(intent)
+            startActivity(Intent(requireContext(), EditActivity::class.java))
         }
 
-        // 设置退出登录按钮
+        binding.layoutFansStat.setOnClickListener {
+            MyFriendsActivity.start(requireContext(), MyFriendsActivity.TAB_FANS)
+        }
+        binding.layoutFollowStat.setOnClickListener {
+            MyFriendsActivity.start(requireContext(), MyFriendsActivity.TAB_FOLLOWING)
+        }
+        binding.layoutLikeStat.setOnClickListener {
+            showLikeSummaryDialog()
+        }
+        binding.rowUid.setOnClickListener {
+            copyUidToClipboard()
+        }
+
         setupLogoutButton()
     } // 🔥 修复点1：在这里加上右大括号，正确结束 onViewCreated 方法
+
+    private fun copyUidToClipboard() {
+        val uid = currentUserId.ifEmpty { SPUtils.getUserId() }
+        if (uid.isEmpty()) {
+            ToastUtils.showShort(requireContext(), "UID 暂不可用")
+            return
+        }
+        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("UID", uid))
+        ToastUtils.showShort(requireContext(), "UID已复制到剪贴板")
+    }
+
+    private fun showLikeSummaryDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_like_summary, null)
+        dialogView.findViewById<android.widget.TextView>(R.id.tv_nickname).text =
+            binding.tvNickname.text
+        dialogView.findViewById<android.widget.TextView>(R.id.tv_like_count).text =
+            binding.tvLikeCount.text
+
+        val dialog = AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialogView.findViewById<View>(R.id.btn_confirm).setOnClickListener {
+            dialog.dismiss()
+        }
+        dialog.show()
+    }
 
     private fun setupStatusBarPadding() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
@@ -176,6 +222,11 @@ class PersonalFragment : Fragment() {
         // 从编辑资料页返回后刷新头像（不必重启 App）
         if (_binding != null) {
             GlideEngine.loadUserAvatar(requireContext(), SPUtils.getAvatar(), binding.ivAvatar)
+            binding.tvSchool.text = UserInfoText.displaySchool(SPUtils.getSchool())
+            val uid = currentUserId.ifEmpty { SPUtils.getUserId() }
+            if (uid.isNotEmpty()) {
+                binding.tvUid.text = uid
+            }
         }
     }
 

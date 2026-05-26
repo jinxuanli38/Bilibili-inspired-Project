@@ -6,11 +6,11 @@ import android.util.Log
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import com.example.bilibili.databinding.ActivityMainBinding
-import com.example.bilibili.ui.focus.FocusOnFragment
 import com.example.bilibili.ui.front.FrontPageFragment
-import com.example.bilibili.ui.memberShip.MemberShipFragment
+import com.example.bilibili.ui.message.MessageFragment
 import com.example.bilibili.ui.personal.PersonalFragment
 import com.example.bilibili.ui.releaseVideo.ReleaseVideoActivity
+import com.example.bilibili.ui.statistics.CreatorStatisticsFragment
 import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.PermissionHelper
 import com.luck.picture.lib.basic.PictureSelector
@@ -22,11 +22,10 @@ import com.luck.picture.lib.interfaces.OnResultCallbackListener
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
-    // Fragment标签常量
     companion object {
         const val TAG_HOME = "tag_home"
-        const val TAG_FOCUS = "tag_focus"
-        const val TAG_SHOP = "tag_shop"
+        const val TAG_STATISTICS = "tag_statistics"
+        const val TAG_MESSAGE = "tag_message"
         const val TAG_MINE = "tag_mine"
     }
 
@@ -37,23 +36,20 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 默认显示首页
         if (savedInstanceState == null) {
             switchFragment(TAG_HOME)
         }
 
-        // 设置底部导航栏监听
         binding.bottomNavView.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_home -> switchFragment(TAG_HOME)
-                R.id.nav_focus_on -> switchFragment(TAG_FOCUS)
-                R.id.nav_shop -> switchFragment(TAG_SHOP)
+                R.id.nav_statistics -> switchFragment(TAG_STATISTICS)
+                R.id.nav_message -> switchFragment(TAG_MESSAGE)
                 R.id.nav_mine -> switchFragment(TAG_MINE)
             }
             true
         }
 
-        // 监听添加按钮
         binding.fabAdd.setOnClickListener {
             PermissionHelper.requestPublishVideo(this) { startVideoPicker() }
         }
@@ -61,56 +57,45 @@ class MainActivity : AppCompatActivity() {
 
     private fun startVideoPicker() {
         PictureSelector.create(this)
-            .openGallery(SelectMimeType.ofVideo()) // 只看视频
-            .setImageEngine(GlideEngine)           // 注入加载引擎
-            .setSelectionMode(SelectModeConfig.SINGLE) // 强制单选
-            .isDisplayCamera(true)                 // 允许直接录制
-            .setMaxSelectNum(1)                    // 最多选1个
-            .isPreviewVideo(false)                 // 禁用视频预览功能
-            .isPreviewImage(false)                 // 禁用图片预览功能
-            .isPreviewAudio(false)                 // 禁用音频预览功能
+            .openGallery(SelectMimeType.ofVideo())
+            .setImageEngine(GlideEngine)
+            .setSelectionMode(SelectModeConfig.SINGLE)
+            .isDisplayCamera(true)
+            .setMaxSelectNum(1)
+            .isPreviewVideo(false)
+            .isPreviewImage(false)
+            .isPreviewAudio(false)
             .forResult(object : OnResultCallbackListener<LocalMedia> {
                 override fun onResult(result: ArrayList<LocalMedia>?) {
-                    val media = result?.getOrNull(0)
-                    if (media != null) {
-                        // 1. 拿到绝对路径
-                        val videoPath = media.realPath
-                        // 2. 拿到视频时长（毫秒）
-                        val duration = media.duration
-
-                        Log.d("BiliSelect", "路径: $videoPath, 时长: ${duration / 1000}秒")
-
-                        // 直接跳转到发布视频页面，让用户在页面中添加分P
-                        val intent =
-                            Intent(this@MainActivity, ReleaseVideoActivity::class.java).apply {
-                                putExtra("video_path", videoPath)
-                                putExtra("video_duration", duration)
-                            }
-                        startActivity(intent)
-                    }
+                    val media = result?.getOrNull(0) ?: return
+                    val videoPath = media.realPath
+                    val duration = media.duration
+                    Log.d("BiliSelect", "路径: $videoPath, 时长: ${duration / 1000}秒")
+                    startActivity(
+                        Intent(this@MainActivity, ReleaseVideoActivity::class.java).apply {
+                            putExtra("video_path", videoPath)
+                            putExtra("video_duration", duration)
+                        },
+                    )
                 }
 
                 override fun onCancel() {
-                    Log.d("BiliSelect", "用户溜了，啥也没选")
+                    Log.d("BiliSelect", "用户取消选择")
                 }
             })
     }
 
     private fun switchFragment(tag: String) {
         val transaction = supportFragmentManager.beginTransaction()
-
         supportFragmentManager.fragments.forEach { fragment ->
-            if (fragment.isAdded) {
-                transaction.hide(fragment)
-            }
+            if (fragment.isAdded) transaction.hide(fragment)
         }
-
         var target = supportFragmentManager.findFragmentByTag(tag)
         if (target == null) {
             target = when (tag) {
                 TAG_HOME -> FrontPageFragment()
-                TAG_FOCUS -> FocusOnFragment()
-                TAG_SHOP -> MemberShipFragment()
+                TAG_STATISTICS -> CreatorStatisticsFragment()
+                TAG_MESSAGE -> MessageFragment()
                 TAG_MINE -> PersonalFragment()
                 else -> FrontPageFragment()
             }
@@ -118,7 +103,6 @@ class MainActivity : AppCompatActivity() {
         } else {
             transaction.show(target)
         }
-
         transaction.commit()
     }
 
@@ -127,11 +111,14 @@ class MainActivity : AppCompatActivity() {
         switchFragment(TAG_MINE)
     }
 
+    fun switchToHomeTab() {
+        binding.bottomNavView.selectedItemId = R.id.nav_home
+        switchFragment(TAG_HOME)
+    }
+
     fun switchToContributeTab() {
         binding.bottomNavView.selectedItemId = R.id.nav_mine
         switchFragment(TAG_MINE)
-
-        // 立即切换到投稿tab，无需延迟
         binding.root.post {
             val fragment = supportFragmentManager.findFragmentByTag(TAG_MINE)
             if (fragment is PersonalFragment) {

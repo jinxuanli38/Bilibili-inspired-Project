@@ -33,7 +33,9 @@ class FansPagingSource : PagingSource<Int, UserFriend>() {
                         otherAvatar = item.optString("otherAvatar"),
                         otherPersonalIntroduction = item.optString("otherPersonalIntroduction"),
                         focusType = item.optInt("focusType"),
-                        focusTime = item.optString("focusTime")
+                        focusTime = item.optString("focusTime"),
+                        otherFansCount = item.optInt("otherFansCount", item.optInt("other_fans_count", 0)),
+                        otherVideoCount = item.optInt("otherVideoCount", item.optInt("other_video_count", 0)),
                     ))
                 }
 

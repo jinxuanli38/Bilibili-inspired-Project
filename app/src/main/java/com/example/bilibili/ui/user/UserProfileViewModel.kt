@@ -28,7 +28,9 @@ data class UserInfo(
     val focusCount: Int,
     val likeCount: Int,
     val playCount: Int,
-    val haveFocus: Boolean
+    val haveFocus: Boolean,
+    /** 0未关注 1已互粉 2已关注 */
+    val focusType: Int = 0,
 )
 
 class UserProfileViewModel : ViewModel() {
@@ -40,6 +42,9 @@ class UserProfileViewModel : ViewModel() {
 
     private val _focusState = MutableLiveData<Boolean>()
     val focusState: LiveData<Boolean> = _focusState
+
+    private val _focusType = MutableLiveData<Int>(0)
+    val focusType: LiveData<Int> = _focusType
 
     fun setUserInfo(data: JSONObject) {
         _userInfo.value = UserInfo(
@@ -57,26 +62,37 @@ class UserProfileViewModel : ViewModel() {
             focusCount = data.optInt("focusCount"),
             likeCount = data.optInt("likeCount"),
             playCount = data.optInt("playCount"),
-            haveFocus = data.optBoolean("haveFocus")
+            haveFocus = data.optBoolean("haveFocus"),
+            focusType = resolveFocusType(data),
         )
 
         _focusState.value = data.optBoolean("haveFocus")
+        _focusType.value = resolveFocusType(data)
     }
 
-    fun setFocused(focused: Boolean) {
+    private fun resolveFocusType(data: JSONObject): Int {
+        if (data.has("focusType")) {
+            return data.optInt("focusType", 0)
+        }
+        return if (data.optBoolean("haveFocus")) 2 else 0
+    }
+
+    fun setFocused(focused: Boolean, type: Int = if (focused) 2 else 0) {
         _focusState.value = focused
+        _focusType.value = type
     }
 
     fun toggleFocus(targetUserId: String) {
         viewModelScope.launch {
             try {
                 val currentState = _focusState.value ?: false
+                val currentType = _focusType.value ?: 0
                 val newState = !currentState
+                val newType = if (newState) 2 else 0
 
-                // 乐观更新 UI
                 _focusState.value = newState
+                _focusType.value = newType
 
-                // 调用 API
                 val result = withContext(Dispatchers.IO) {
                     if (newState) {
                         postService.focus(targetUserId)
@@ -87,12 +103,13 @@ class UserProfileViewModel : ViewModel() {
 
                 val jsonObject = JSONObject(result)
                 if (jsonObject.optInt("code") != 200) {
-                    // 失败回滚
                     _focusState.value = currentState
+                    _focusType.value = currentType
                 }
             } catch (e: Exception) {
-                // 异常回滚
-                _focusState.value = (_focusState.value == false)
+                val wasFocused = _focusState.value ?: false
+                _focusState.value = !wasFocused
+                _focusType.value = if (!wasFocused) 2 else 0
             }
         }
     }

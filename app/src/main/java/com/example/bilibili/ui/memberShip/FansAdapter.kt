@@ -40,7 +40,7 @@ class FansAdapter(
                 1 -> {
                     setTextColor(Color.parseColor("#999999"))
                     setBackgroundResource(R.drawable.shape_follow_btn_grey)
-                    "互相关注"
+                    "已互粉"
                 }
                 0 -> "回关"
                 else -> "已关注"

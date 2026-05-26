@@ -42,7 +42,7 @@ class FansAdapter(
                     // 互相关注
                     setTextColor(Color.parseColor("#999999"))
                     setBackgroundResource(R.drawable.shape_follow_btn_grey)
-                    text = "互相关注"
+                    text = "已互粉"
                 }
                 else -> {
                     // 可以回关

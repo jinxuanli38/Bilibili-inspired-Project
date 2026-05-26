@@ -44,7 +44,9 @@ class MemberShipFragment : Fragment() {
                     showCancelFollowDialog(user)
                 }
             },
-            onUserClick = { user -> openUserProfile(user.otherUserId) }
+            onUserClick = { user -> openUserProfile(user.otherUserId) },
+            onMoreClick = {},
+            showMoreMenu = false,
         )
 
         // 2. 设置 RecyclerView 和 SwipeRefresh

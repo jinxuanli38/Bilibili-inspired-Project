@@ -45,4 +45,14 @@ class FansViewModel : ViewModel() {
             false
         }
     }
+
+    suspend fun removeFan(fanUserId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            service.removeFan(fanUserId)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
 }

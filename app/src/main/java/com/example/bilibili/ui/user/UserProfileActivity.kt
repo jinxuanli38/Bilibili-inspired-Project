@@ -1,7 +1,11 @@
 package com.example.bilibili.ui.user
 
 import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import androidx.activity.viewModels
@@ -19,6 +23,7 @@ import com.example.bilibili.ui.edit.EditActivity
 import com.example.bilibili.ui.personal.contribute.ContributeFragment
 import com.example.bilibili.ui.personal.home.HomeFragment
 import com.example.bilibili.ui.login.LoginActivity
+import com.example.bilibili.util.FollowActionButtonUi
 import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.SPUtils
@@ -196,9 +201,29 @@ class UserProfileActivity : AppCompatActivity() {
 
         viewModel.focusState.observe(this) { isFocused ->
             if (!isCurrentUser()) {
-                updateFocusButton(isFocused)
+                updateFocusButton(isFocused, viewModel.focusType.value ?: 0)
             }
         }
+
+        viewModel.focusType.observe(this) { type ->
+            if (!isCurrentUser() && (viewModel.focusState.value == true)) {
+                updateFocusButton(true, type)
+            }
+        }
+
+        binding.rowUid.setOnClickListener {
+            copyUidToClipboard(targetUserId.orEmpty())
+        }
+    }
+
+    private fun copyUidToClipboard(uid: String) {
+        if (uid.isEmpty()) {
+            ToastUtils.showShort(this, "UID 暂不可用")
+            return
+        }
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("UID", uid))
+        ToastUtils.showShort(this, "UID已复制到剪贴板")
     }
 
     private fun updateUI(userInfo: UserInfo) {
@@ -210,6 +235,15 @@ class UserProfileActivity : AppCompatActivity() {
 
         // 设置简介
         binding.tvDescription.text = UserInfoText.displayIntroduction(userInfo.personalIntroduction)
+        binding.tvSchool.text = UserInfoText.displaySchool(userInfo.school)
+        binding.tvUid.text = userInfo.userId
+        binding.tvNickname.setTextColor(
+            if (!isCurrentUser() && userInfo.focusType == 1) {
+                Color.parseColor("#FB7299")
+            } else {
+                Color.parseColor("#212121")
+            },
+        )
 
         // 设置统计数据
         binding.tvFansCount.text = userInfo.fansCount.toString()
@@ -218,23 +252,20 @@ class UserProfileActivity : AppCompatActivity() {
 
         // 他人主页才更新关注状态
         if (!isCurrentUser()) {
-            viewModel.setFocused(userInfo.haveFocus)
+            viewModel.setFocused(userInfo.haveFocus, userInfo.focusType)
+            updateFocusButton(userInfo.haveFocus, userInfo.focusType)
         }
 
         // 显示内容，隐藏加载遮罩
         binding.loadingView.visibility = View.GONE
     }
 
-    private fun updateFocusButton(isFocused: Boolean) {
+    private fun updateFocusButton(isFocused: Boolean, focusType: Int) {
         if (isCurrentUser()) return
         if (isFocused) {
-            binding.btnFocus.text = "已关注"
-            binding.btnFocus.setBackgroundColor(resources.getColor(R.color.sl_divider_color))
-            binding.btnFocus.setTextColor(resources.getColor(R.color.sl_comment_item_color_default))
+            FollowActionButtonUi.bind(binding.btnFocus, focusType)
         } else {
-            binding.btnFocus.text = "关注"
-            binding.btnFocus.setBackgroundColor(resources.getColor(R.color.bilibili_pink))
-            binding.btnFocus.setTextColor(resources.getColor(R.color.white))
+            FollowActionButtonUi.bind(binding.btnFocus, 0)
         }
     }
 

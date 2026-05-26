@@ -73,6 +73,12 @@ interface PostService {
         @Field("focusUserId") focusUserId: String
     ): String
 
+    @POST("ucenter/home/removeFan")
+    @FormUrlEncoded
+    suspend fun removeFan(
+        @Field("fanUserId") fanUserId: String
+    ): String
+
     // 更新用户信息
     @POST("ucenter/home/updateUserInfo")
     @FormUrlEncoded

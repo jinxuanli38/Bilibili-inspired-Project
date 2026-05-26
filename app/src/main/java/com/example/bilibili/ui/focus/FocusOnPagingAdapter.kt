@@ -2,6 +2,7 @@ package com.example.bilibili.ui.focus
 
 import android.graphics.Color
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
@@ -9,11 +10,13 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.bilibili.R
 import com.example.bilibili.data.model.UserFriend
 import com.example.bilibili.databinding.ItemFriendBinding
+import com.example.bilibili.util.FollowActionButtonUi
 import com.example.bilibili.util.GlideEngine
+import com.example.bilibili.util.UserInfoText
 
 class FocusOnPagingAdapter(
     private val onActionClick: (UserFriend) -> Unit,
-    private val onUserClick: (UserFriend) -> Unit
+    private val onUserClick: (UserFriend) -> Unit,
 ) : PagingDataAdapter<UserFriend, FocusOnPagingAdapter.ViewHolder>(UserFriendDiffCallback()) {
 
     class ViewHolder(val binding: ItemFriendBinding) : RecyclerView.ViewHolder(binding.root)
@@ -27,29 +30,23 @@ class FocusOnPagingAdapter(
         val user = getItem(position) ?: return
         val binding = holder.binding
 
-        // 1. 设置基础信息
         binding.tvNickname.text = user.otherNickName
-        binding.tvDescription.text = com.example.bilibili.util.UserInfoText.displayIntroduction(
-            user.otherPersonalIntroduction
+        binding.tvNickname.setTextColor(
+            if (user.focusType == 1) Color.parseColor("#FB7299") else Color.parseColor("#212121"),
         )
+        binding.tvDescription.text = UserInfoText.displayIntroduction(user.otherPersonalIntroduction)
         GlideEngine.loadUserAvatar(binding.root.context, user.otherAvatar, binding.ivAvatar)
 
         binding.root.setOnClickListener { onUserClick(user) }
         binding.ivAvatar.setOnClickListener { onUserClick(user) }
+        binding.ivMore.visibility = View.GONE
 
-        // 2. 根据 focusType 设置按钮文字和样式
         binding.btnFollowAction.apply {
-            setTextColor(Color.parseColor("#999999"))
-            setBackgroundResource(R.drawable.shape_follow_btn_grey)
-
-            // 在关注页面中，所有用户都是已关注的，只是区分是否互相关注
-            text = if (user.focusType == 1) "互相关注" else "已关注"
-
+            FollowActionButtonUi.bind(this, user.focusType)
             setOnClickListener { onActionClick(user) }
         }
     }
 
-    // DiffCallback用于比较数据项是否相同
     class UserFriendDiffCallback : DiffUtil.ItemCallback<UserFriend>() {
         override fun areItemsTheSame(oldItem: UserFriend, newItem: UserFriend): Boolean {
             return oldItem.otherUserId == newItem.otherUserId
