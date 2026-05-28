@@ -5,7 +5,11 @@
         <item name="cornerSize">8dp</item>
     </style>
 
-    <style name="Theme.Bilibili" parent="Theme.AppCompat.Light.NoActionBar" />
+    <style name="Theme.Bilibili" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorAccent">@color/bili_pink</item>
+        <item name="colorControlActivated">@color/bili_pink</item>
+        <item name="editTextStyle">@style/BilibiliEditTextStyle</item>
+    </style>
 
     <style name="Theme.Bilibili.Splash" parent="Theme.Bilibili">
         <item name="android:windowBackground">@color/splash_background</item>
@@ -35,6 +39,12 @@
 
     <style name="TransparentBottomSheetStyle" parent="Theme.Design.Light.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/CustomBottomSheetStyle</item>
+    </style>
+
+    <style name="PartTitleBottomSheetTheme" parent="Theme.Design.Light.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/CustomBottomSheetStyle</item>
+        <item name="android:editTextStyle">@style/BilibiliEditTextStyle</item>
+        <item name="editTextStyle">@style/BilibiliEditTextStyle</item>
     </style>
 
     <style name="CustomBottomSheetStyle" parent="Widget.Design.BottomSheet.Modal">
@@ -130,6 +140,8 @@
         <item name="colorPrimary">#FB7299</item>
         <item name="colorPrimaryVariant">#FB7299</item>
         <item name="colorSecondary">#FB7299</item>
+        <item name="colorControlActivated">@color/bili_pink</item>
+        <item name="editTextStyle">@style/BilibiliEditTextStyle</item>
     </style>
 
     <style name="BiliTabTextStyle" parent="TextAppearance.Design.Tab">
@@ -149,6 +161,10 @@
         <item name="colorControlActivated">#FB7299</item>
         <item name="colorControlHighlight">#FB7299</item>
         <item name="colorControlNormal">#CCCCCC</item>
+        <item name="android:textCursorDrawable">@drawable/cursor_drawable</item>
+        <item name="android:textSelectHandle">@drawable/text_cursor_handle_middle</item>
+        <item name="android:textSelectHandleLeft">@drawable/text_cursor_handle_left</item>
+        <item name="android:textSelectHandleRight">@drawable/text_cursor_handle_right</item>
     </style>
 
 </resources>

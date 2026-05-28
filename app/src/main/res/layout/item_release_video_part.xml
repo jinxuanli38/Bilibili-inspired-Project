@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="118dp"
+    android:layout_height="100dp"
+    android:layout_marginEnd="8dp"
+    android:background="@drawable/bg_release_part_card">
+
+    <TextView
+        android:id="@+id/tv_part_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#B3B3B3"
+        android:textSize="13sp"
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="8dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="P1" />
+
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/barrier_part_header"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierDirection="bottom"
+        app:constraint_referenced_ids="tv_part_label,btn_more" />
+
+    <FrameLayout
+        android:id="@+id/btn_more"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/bg_release_part_more_btn_ripple"
+        android:clickable="true"
+        android:elevation="2dp"
+        android:focusable="true"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_more_horiz" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/et_part_title"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="8dp"
+        android:nestedScrollingEnabled="false"
+        android:background="@null"
+        android:breakStrategy="simple"
+        android:gravity="top|start"
+        android:hint="@string/release_part_title_hint"
+        android:maxLines="4"
+        android:overScrollMode="never"
+        android:scrollHorizontally="false"
+        android:scrollbars="none"
+        android:textColor="#212121"
+        android:textColorHint="#CCCCCC"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toTopOf="@id/progress_part_upload"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/barrier_part_header"
+        tools:text="VID_20260525_105902" />
+
+    <ProgressBar
+        android:id="@+id/progress_part_upload"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="0dp"
+        android:layout_height="2dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="6dp"
+        android:max="100"
+        android:progress="0"
+        android:progressTint="@color/bili_pink"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:progress="55"
+        tools:visibility="visible" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

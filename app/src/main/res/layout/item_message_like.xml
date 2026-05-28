@@ -6,32 +6,92 @@
     android:layout_height="wrap_content"
     android:background="@color/white"
     android:paddingStart="16dp"
-    android:paddingTop="14dp"
+    android:paddingTop="16dp"
     android:paddingEnd="16dp"
-    android:paddingBottom="14dp">
+    android:paddingBottom="16dp">
 
-    <com.google.android.material.imageview.ShapeableImageView
-        android:id="@+id/iv_avatar"
+    <FrameLayout
+        android:id="@+id/layout_avatar"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:scaleType="centerCrop"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:shapeAppearanceOverlay="@style/CircleImage"
-        tools:src="@tools:sample/avatars" />
+        app:layout_constraintTop_toTopOf="parent">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/iv_avatar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            app:shapeAppearanceOverlay="@style/CircleImage"
+            tools:src="@tools:sample/avatars" />
+
+        <ImageView
+            android:id="@+id/iv_type_badge"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_gravity="bottom|end"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_message_quick_like"
+            tools:ignore="ContentDescription" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/layout_preview_group"
+        android:layout_width="72dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/tv_preview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:gravity="top|end"
+            android:maxLines="4"
+            android:textColor="@color/grey"
+            android:textSize="12sp"
+            tools:text="刚高中毕业，选的计算机..." />
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/iv_preview_cover"
+            android:layout_width="72dp"
+            android:layout_height="48dp"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            app:shapeAppearanceOverlay="@style/RoundedImage4"
+            tools:visibility="visible" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/tv_names"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:textColor="#212121"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toStartOf="@id/layout_preview_group"
+        app:layout_constraintStart_toEndOf="@id/layout_avatar"
+        app:layout_constraintTop_toTopOf="@id/layout_avatar"
+        tools:text="Victor_Alex 、 摸鱼划水 、 碎碎念 等" />
 
     <TextView
         android:id="@+id/tv_summary"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
+        android:layout_marginTop="6dp"
         android:layout_marginEnd="8dp"
-        android:textColor="#212121"
-        android:textSize="15sp"
-        app:layout_constraintEnd_toStartOf="@id/layout_preview"
-        app:layout_constraintStart_toEndOf="@id/iv_avatar"
-        app:layout_constraintTop_toTopOf="@id/iv_avatar"
-        tools:text="浪漫这一款 等总计26人赞了我的评论" />
+        android:textColor="#999999"
+        android:textSize="14sp"
+        app:layout_constraintEnd_toStartOf="@id/layout_preview_group"
+        app:layout_constraintStart_toEndOf="@id/layout_avatar"
+        app:layout_constraintTop_toBottomOf="@id/tv_names"
+        tools:text="总计26人赞了我的评论" />
 
     <TextView
         android:id="@+id/tv_time"
@@ -41,56 +101,35 @@
         android:layout_marginTop="8dp"
         android:textColor="#999999"
         android:textSize="12sp"
-        app:layout_constraintStart_toEndOf="@id/iv_avatar"
+        app:layout_constraintStart_toEndOf="@id/layout_avatar"
         app:layout_constraintTop_toBottomOf="@id/tv_summary"
         tools:text="2天前" />
 
-    <FrameLayout
-        android:id="@+id/layout_preview"
-        android:layout_width="72dp"
-        android:layout_height="72dp"
-        android:background="@drawable/bg_message_preview"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            android:id="@+id/tv_preview"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:ellipsize="end"
-            android:maxLines="4"
-            android:padding="6dp"
-            android:textColor="#999999"
-            android:textSize="11sp"
-            tools:text="刚高中毕业，选的计算机..." />
-
-        <com.google.android.material.imageview.ShapeableImageView
-            android:id="@+id/iv_preview_cover"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="centerCrop"
-            android:visibility="gone"
-            app:shapeAppearanceOverlay="@style/RoundedImage4" />
-    </FrameLayout>
-
     <ImageView
         android:id="@+id/iv_more"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
         android:contentDescription="@null"
-        android:padding="2dp"
         android:src="@drawable/ic_more_vert"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toBottomOf="@id/tv_time"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/tv_time"
         app:tint="#CCCCCC" />
+
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/barrier_row_bottom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierDirection="bottom"
+        app:constraint_referenced_ids="tv_time,layout_preview_group,iv_more" />
 
     <View
         android:layout_width="0dp"
         android:layout_height="0.5dp"
-        android:layout_marginTop="14dp"
+        android:layout_marginTop="16dp"
         android:background="@color/bili_divider"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@id/tv_summary"
-        app:layout_constraintTop_toBottomOf="@id/tv_time" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/barrier_row_bottom" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

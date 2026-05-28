@@ -9,10 +9,13 @@
     android:orientation="vertical"
     android:padding="12dp">
 
-    <View
+    <ImageView
+        android:id="@+id/iv_icon"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:background="@drawable/bg_creator_service_icon_placeholder" />
+        android:src="@drawable/ic_custom_document_setting"
+        android:contentDescription="@null"
+        android:scaleType="centerInside" />
 
     <TextView
         android:id="@+id/tv_title"

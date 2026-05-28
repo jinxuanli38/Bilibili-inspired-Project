@@ -6,6 +6,12 @@ import retrofit2.http.POST
 
 interface MessageService {
 
+    @POST("message/loadAllMessage")
+    @FormUrlEncoded
+    suspend fun loadAllMessage(
+        @Field("pageNo") pageNo: Int,
+    ): String
+
     @POST("message/loadMessage")
     @FormUrlEncoded
     suspend fun loadMessage(

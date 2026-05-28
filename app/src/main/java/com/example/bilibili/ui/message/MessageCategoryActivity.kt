@@ -32,7 +32,8 @@ class MessageCategoryActivity : AppCompatActivity() {
     private var pageMode: Int = MODE_REPLY
     private var atMeOnly: Int? = null
     private var pagingJob: Job? = null
-    private lateinit var adapter: MessageCategoryAdapter
+    private lateinit var categoryAdapter: MessageCategoryAdapter
+    private lateinit var likeAdapter: LikeMessageAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,11 +47,12 @@ class MessageCategoryActivity : AppCompatActivity() {
             else -> getString(R.string.message_quick_reply)
         }
 
-        adapter = MessageCategoryAdapter(pageMode) { item ->
+        categoryAdapter = MessageCategoryAdapter(pageMode) { item ->
             followBack(item)
         }
+        likeAdapter = LikeMessageAdapter()
         binding.rvList.layoutManager = LinearLayoutManager(this)
-        binding.rvList.adapter = adapter
+        binding.rvList.adapter = if (pageMode == MODE_LIKE) likeAdapter else categoryAdapter
 
         binding.btnBack.setOnClickListener { finish() }
         binding.btnClear.setOnClickListener { markAllRead() }
@@ -111,11 +113,19 @@ class MessageCategoryActivity : AppCompatActivity() {
 
     private fun setupSwipeRefresh() {
         binding.swipeRefresh.setColorSchemeResources(R.color.bili_pink)
-        binding.swipeRefresh.setOnRefreshListener { adapter.refresh() }
+        binding.swipeRefresh.setOnRefreshListener {
+            if (pageMode == MODE_LIKE) likeAdapter.refresh() else categoryAdapter.refresh()
+        }
         lifecycleScope.launch {
-            adapter.loadStateFlow.collectLatest { state ->
+            val loadStates = if (pageMode == MODE_LIKE) {
+                likeAdapter.loadStateFlow
+            } else {
+                categoryAdapter.loadStateFlow
+            }
+            loadStates.collectLatest { state ->
                 binding.swipeRefresh.isRefreshing = state.refresh is LoadState.Loading
-                val isEmpty = state.refresh is LoadState.NotLoading && adapter.itemCount == 0
+                val count = if (pageMode == MODE_LIKE) likeAdapter.itemCount else categoryAdapter.itemCount
+                val isEmpty = state.refresh is LoadState.NotLoading && count == 0
                 binding.tvEmpty.isVisible = isEmpty
             }
         }
@@ -124,23 +134,33 @@ class MessageCategoryActivity : AppCompatActivity() {
     private fun collectPaging() {
         pagingJob?.cancel()
         pagingJob = lifecycleScope.launch {
-            createPagerFlow().collectLatest { pagingData ->
-                adapter.submitData(pagingData)
+            if (pageMode == MODE_LIKE) {
+                createLikePagerFlow().collectLatest { pagingData ->
+                    likeAdapter.submitData(pagingData)
+                }
+            } else {
+                createCategoryPagerFlow().collectLatest { pagingData ->
+                    categoryAdapter.submitData(pagingData)
+                }
             }
         }
     }
 
-    private fun createPagerFlow() = androidx.paging.Pager(
+    private fun createLikePagerFlow() = androidx.paging.Pager(
+        config = com.example.bilibili.util.PagingDefaults.videoListConfig(),
+        pagingSourceFactory = {
+            MessagePagingSource(
+                messageType = MessageTypes.LIKE,
+                messageTypes = "${MessageTypes.LIKE},${MessageTypes.COLLECTION}",
+            )
+        },
+    ).flow
+
+    private fun createCategoryPagerFlow() = androidx.paging.Pager(
         config = com.example.bilibili.util.PagingDefaults.videoListConfig(),
         pagingSourceFactory = {
             when (pageMode) {
-                MODE_LIKE -> MessagePagingSource(
-                    messageType = MessageTypes.LIKE,
-                    messageTypes = "${MessageTypes.LIKE},${MessageTypes.COLLECTION}",
-                )
-                MODE_FANS -> MessagePagingSource(
-                    messageType = MessageTypes.FANS,
-                )
+                MODE_FANS -> MessagePagingSource(messageType = MessageTypes.FANS)
                 else -> MessagePagingSource(
                     messageType = MessageTypes.COMMENT,
                     atMeOnly = atMeOnly,
@@ -163,7 +183,7 @@ class MessageCategoryActivity : AppCompatActivity() {
                 }
                 if (ok) {
                     ToastUtils.showShort(this@MessageCategoryActivity, getString(R.string.message_clear_done))
-                    adapter.refresh()
+                    if (pageMode == MODE_LIKE) likeAdapter.refresh() else categoryAdapter.refresh()
                 } else {
                     ToastUtils.showShort(this@MessageCategoryActivity, "操作失败")
                 }

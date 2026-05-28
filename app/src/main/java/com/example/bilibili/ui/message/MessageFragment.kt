@@ -6,20 +6,32 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.paging.LoadState
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.example.bilibili.MainActivity
 import com.example.bilibili.R
+import com.example.bilibili.data.api.MessageService
 import com.example.bilibili.databinding.FragmentMessageBinding
 import com.example.bilibili.databinding.ItemMessageQuickActionBinding
+import com.example.bilibili.util.ApiJson.isSuccess
+import com.example.bilibili.util.RetrofitClient
+import com.example.bilibili.util.ToastUtils
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 class MessageFragment : Fragment() {
 
     private var _binding: FragmentMessageBinding? = null
     private val binding get() = _binding!!
 
-    private val adapter = MessageConversationAdapter()
+    private val inboxAdapter = MessageInboxAdapter()
+    private val messageService = RetrofitClient.create(MessageService::class.java)
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -35,7 +47,12 @@ class MessageFragment : Fragment() {
         setupInsets()
         setupToolbar()
         setupQuickActions()
-        setupMessageList()
+        setupInboxList()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        inboxAdapter.refresh()
     }
 
     private fun setupInsets() {
@@ -47,12 +64,7 @@ class MessageFragment : Fragment() {
     }
 
     private fun setupToolbar() {
-        binding.btnBack.setOnClickListener {
-            (activity as? MainActivity)?.switchToHomeTab()
-        }
-        binding.btnClear.setOnClickListener {
-            // UI 占位，后续接清除未读接口
-        }
+        binding.btnMarkAllRead.setOnClickListener { markAllRead() }
     }
 
     private fun setupQuickActions() {
@@ -96,69 +108,56 @@ class MessageFragment : Fragment() {
         itemBinding.tvLabel.text = label
     }
 
-    private fun setupMessageList() {
+    private fun setupInboxList() {
         binding.rvMessages.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvMessages.adapter = adapter
-        adapter.submitList(buildPreviewConversations())
+        binding.rvMessages.adapter = inboxAdapter
+        binding.swipeRefresh.setColorSchemeResources(R.color.bili_pink)
+        binding.swipeRefresh.setOnRefreshListener { inboxAdapter.refresh() }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    androidx.paging.Pager(
+                        config = com.example.bilibili.util.PagingDefaults.videoListConfig(),
+                        pagingSourceFactory = { AllMessagePagingSource() },
+                    ).flow.collectLatest { pagingData ->
+                        inboxAdapter.submitData(pagingData)
+                    }
+                }
+                launch {
+                    inboxAdapter.loadStateFlow.collectLatest { state ->
+                        binding.swipeRefresh.isRefreshing = state.refresh is LoadState.Loading
+                        val isEmpty = state.refresh is LoadState.NotLoading && inboxAdapter.itemCount == 0
+                        binding.tvEmpty.isVisible = isEmpty
+                    }
+                }
+            }
+        }
     }
 
-    private fun buildPreviewConversations(): List<MessageConversationItem> = listOf(
-        MessageConversationItem(
-            name = "创作小助手",
-            preview = "[自动回复]你好鸭!感谢关注! 哔哩哔哩(゜-゜)つロ 干杯~",
-            time = "5月12日",
-            avatarBackgroundRes = R.drawable.bg_message_avatar_system_blue,
-            avatarIconRes = R.drawable.ic_message,
-            unreadStyle = MessageUnreadStyle.DOT,
-        ),
-        MessageConversationItem(
-            name = "系统通知",
-            preview = "双11限时礼包: 年度大会员4.6折, 最高再赠366天",
-            time = "5月12日",
-            avatarBackgroundRes = R.drawable.bg_message_avatar_system_pink,
-            avatarIconRes = R.drawable.ic_message,
-            unreadStyle = MessageUnreadStyle.COUNT,
-            unreadCount = 1,
-        ),
-        MessageConversationItem(
-            name = "猫嬷王",
-            preview = "hi! 我整理了《SpringBoot+Vue》全套源码, 回复【1】领取",
-            time = "5月8日",
-        ),
-        MessageConversationItem(
-            name = "小清Eric",
-            preview = "求Springboot+vue源码",
-            time = "5月8日",
-            highlightName = true,
-        ),
-        MessageConversationItem(
-            name = "samwu",
-            preview = "关注了你哟!",
-            time = "5月8日",
-        ),
-        MessageConversationItem(
-            name = "小清Eric",
-            preview = "求Springboot+vue源码",
-            time = "5月8日",
-            highlightName = true,
-        ),
-        MessageConversationItem(
-            name = "samwu",
-            preview = "关注了你哟!",
-            time = "5月8日",
-        ),
-        MessageConversationItem(
-            name = "小清Eric",
-            preview = "求Springboot+vue源码",
-            time = "5月8日",
-            highlightName = true,
-        ),
-        MessageConversationItem(
-            name = "samwu",
-            preview = "关注了你哟!",
-            time = "5月8日",
-        ),
-    )
+    private fun markAllRead() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val types = listOf(
+                    MessageTypes.LIKE,
+                    MessageTypes.COLLECTION,
+                    MessageTypes.COMMENT,
+                    MessageTypes.FANS,
+                )
+                val ok = types.all { type ->
+                    JSONObject(messageService.readAll(type)).isSuccess()
+                }
+                if (ok) {
+                    ToastUtils.showShort(requireContext(), getString(R.string.message_clear_done))
+                    inboxAdapter.refresh()
+                } else {
+                    ToastUtils.showShort(requireContext(), "操作失败")
+                }
+            } catch (e: Exception) {
+                ToastUtils.showShort(requireContext(), e.message ?: "操作失败")
+            }
+        }
+    }
 
     override fun onDestroyView() {
         super.onDestroyView()

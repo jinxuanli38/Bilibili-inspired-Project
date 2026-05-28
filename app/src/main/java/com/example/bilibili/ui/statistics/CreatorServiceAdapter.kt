@@ -5,7 +5,9 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.example.bilibili.R
 import com.example.bilibili.data.model.CreatorServiceEntry
+import com.example.bilibili.data.model.ServiceAction
 import com.example.bilibili.databinding.ItemCreatorServiceBinding
 
 class CreatorServiceAdapter(
@@ -32,6 +34,13 @@ class CreatorServiceAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(item: CreatorServiceEntry) {
             binding.tvTitle.text = item.title
+            binding.ivIcon.setImageResource(
+                when (item.action) {
+                    ServiceAction.VIDEO_POST -> R.drawable.ic_custom_document_setting
+                    ServiceAction.COMMENT -> R.drawable.ic_edit_box
+                    ServiceAction.DANMU -> R.drawable.ic_sprout_leaf
+                },
+            )
         }
     }
 

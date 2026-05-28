@@ -117,23 +117,33 @@ object GlideEngine : ImageEngine {
      * @param coverPath 封面路径
      * @param cornerRadius 圆角大小，单位为 px（例如 15px）
      */
-    fun loadVideoCover(context: Context, coverPath: String, imageView: ImageView, cornerRadius: Int = 20) {
+    fun loadVideoCover(context: Context, coverPath: String?, imageView: ImageView, cornerRadius: Int = 20) {
         if (!isContextValid(context)) return
 
-        // 同样拼接 Base URL，注意检查参数名是否也是 sourceName
-        val fullUrl = "${RetrofitClient.BASE_URL}file/getImage?sourceName=$coverPath"
-
+        val path = coverPath?.trim().orEmpty()
+        val model = resolveCoverModel(path)
         Glide.with(context)
-            .load(fullUrl)
-            // 1. 占位图换成长方形的
+            .load(model)
             .placeholder(R.drawable.ic_bili_placeholder)
-            // 2. 居中裁剪，防止图片比例不对时产生拉伸
+            .error(R.drawable.ic_bili_placeholder)
             .centerCrop()
-            // 3. 设置圆角（而不是圆形）
             .transform(com.bumptech.glide.load.resource.bitmap.RoundedCorners(cornerRadius))
-            // 4. 渐变动画，加载出来的时候更丝滑
             .transition(com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade())
             .into(imageView)
+    }
+
+    private fun resolveCoverModel(path: String): Any {
+        if (path.isEmpty() || path.equals("null", ignoreCase = true)) {
+            return R.drawable.ic_bili_placeholder
+        }
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+            return path
+        }
+        if (path.startsWith("/")) {
+            val file = File(path)
+            if (file.exists()) return file
+        }
+        return "${RetrofitClient.BASE_URL}file/getImage?sourceName=$path"
     }
 
     /**

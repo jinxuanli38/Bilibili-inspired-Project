@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_replace_video"
+        android:title="@string/release_part_replace_video" />
+    <item
+        android:id="@+id/action_edit_title"
+        android:title="@string/release_part_edit_title" />
+    <item
+        android:id="@+id/action_delete_part"
+        android:title="@string/release_part_delete" />
+</menu>

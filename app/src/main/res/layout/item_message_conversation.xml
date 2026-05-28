@@ -5,18 +5,16 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@color/white"
-    android:minHeight="76dp"
     android:paddingStart="16dp"
     android:paddingTop="14dp"
     android:paddingEnd="16dp"
-    android:paddingBottom="14dp">
+    android:paddingBottom="16dp">
 
     <com.google.android.material.imageview.ShapeableImageView
         android:id="@+id/iv_avatar"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:scaleType="centerCrop"
-        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:shapeAppearanceOverlay="@style/CircleImage"
@@ -66,13 +64,12 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="8dp"
         android:layout_marginEnd="28dp"
         android:ellipsize="end"
-        android:maxLines="1"
+        android:maxLines="2"
         android:textColor="@color/bili_text_grey"
         android:textSize="14sp"
-        app:layout_constraintBottom_toBottomOf="@id/iv_avatar"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@id/iv_avatar"
         app:layout_constraintTop_toBottomOf="@id/tv_name"
@@ -104,12 +101,21 @@
         tools:text="1"
         tools:visibility="gone" />
 
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/barrier_content_bottom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierDirection="bottom"
+        app:constraint_referenced_ids="iv_avatar,tv_preview" />
+
     <View
+        android:id="@+id/divider"
         android:layout_width="0dp"
         android:layout_height="0.5dp"
+        android:layout_marginTop="14dp"
         android:background="@color/bili_divider"
-        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@id/tv_name" />
+        app:layout_constraintStart_toStartOf="@id/tv_name"
+        app:layout_constraintTop_toBottomOf="@id/barrier_content_bottom" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

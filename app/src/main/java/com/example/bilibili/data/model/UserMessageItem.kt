@@ -13,8 +13,20 @@ data class UserMessageItem(
     val videoCover: String,
     val messageContent: String,
     val messageContentReply: String,
+    val commentId: Int,
+    val previewType: String,
     val createTimeRaw: String,
 ) {
+    val isCommentTarget: Boolean
+        get() = when (previewType) {
+            "video" -> false
+            "comment" -> true
+            else -> commentId > 0 || messageContentReply.isNotBlank()
+        }
+
+    fun previewTextForLike(): String =
+        messageContentReply.ifBlank { messageContent }.ifBlank { videoName }
+
     companion object {
         fun fromJson(json: JSONObject): UserMessageItem {
             val extend = json.optJSONObject("extendDto")
@@ -25,16 +37,24 @@ data class UserMessageItem(
             return UserMessageItem(
                 messageId = json.optInt("messageId"),
                 messageType = json.optInt("messageType"),
-                sendUserId = json.optString("sendUserId", ""),
-                sendUserName = json.optString("sendUserName", ""),
-                sendUserAvatar = json.optString("sendUserAvatar", ""),
-                videoId = json.optString("videoId", ""),
-                videoName = json.optString("videoName", ""),
-                videoCover = json.optString("videoCover", ""),
-                messageContent = extend.optString("messageContent", ""),
-                messageContentReply = extend.optString("messageContentReply", ""),
-                createTimeRaw = json.optString("createTime", ""),
+                sendUserId = json.optCleanString("sendUserId"),
+                sendUserName = json.optCleanString("sendUserName"),
+                sendUserAvatar = json.optCleanString("sendUserAvatar"),
+                videoId = json.optCleanString("videoId"),
+                videoName = json.optCleanString("videoName"),
+                videoCover = json.optCleanString("videoCover"),
+                messageContent = extend.optCleanString("messageContent"),
+                messageContentReply = extend.optCleanString("messageContentReply"),
+                commentId = extend.optInt("commentId", 0),
+                previewType = extend.optCleanString("previewType"),
+                createTimeRaw = json.optCleanString("createTime"),
             )
+        }
+
+        private fun JSONObject.optCleanString(key: String): String {
+            if (!has(key) || isNull(key)) return ""
+            val value = optString(key, "").trim()
+            return if (value.equals("null", ignoreCase = true)) "" else value
         }
     }
 }

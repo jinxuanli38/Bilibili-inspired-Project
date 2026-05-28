@@ -2,27 +2,49 @@ package com.example.bilibili.ui.releaseVideo
 
 import android.annotation.SuppressLint
 import android.app.Dialog
+import android.animation.ObjectAnimator
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.LinearLayout
+import android.widget.PopupWindow
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.doOnTextChanged
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.DefaultItemAnimator
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.example.bilibili.R
+import com.example.bilibili.data.model.ReleaseVideoPart
 import com.example.bilibili.data.api.FileService
 import com.example.bilibili.databinding.ActivityReleaseVideoBinding
 import com.example.bilibili.databinding.DialogAgreementBinding
 import com.example.bilibili.databinding.ItemSimpleTagBinding
+import com.example.bilibili.databinding.LayoutPartMoreMenuBinding
 import com.example.bilibili.ui.releaseVideo.bottomSheet.AuthorStatementBottomSheetDialogFragment
 import com.example.bilibili.ui.releaseVideo.bottomSheet.IntroductionBottomSheetDialogFragment
+import com.example.bilibili.ui.releaseVideo.bottomSheet.PartTitleBottomSheetDialogFragment
 import com.example.bilibili.ui.releaseVideo.bottomSheet.TagBottomSheetDialogFragment
+import com.example.bilibili.util.GlideEngine
+import com.example.bilibili.util.PermissionHelper
 import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.ToastUtils
 import com.example.bilibili.util.VideoThumbnailUtil
 import com.example.bilibili.util.UiUtils.dp
+import com.luck.picture.lib.basic.PictureSelector
+import com.luck.picture.lib.config.SelectMimeType
+import com.luck.picture.lib.config.SelectModeConfig
+import com.luck.picture.lib.entity.LocalMedia
+import com.luck.picture.lib.interfaces.OnResultCallbackListener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -36,6 +58,25 @@ class ReleaseVideoActivity : AppCompatActivity() {
 
     private val viewModel: ReleaseVideoViewModel by viewModels()
 
+    private lateinit var partAdapter: ReleaseVideoPartAdapter
+
+    private lateinit var partItemTouchHelper: ItemTouchHelper
+
+    private var partMenuDimView: View? = null
+    private var hasCustomCover: Boolean = false
+    private var hasInitDefaultCover: Boolean = false
+    private var lastPartCount: Int = 0
+    private var topProgressAnimator: ObjectAnimator? = null
+    private var topProgressPartId: String? = null
+    private var lastTopShownProgress = 0
+
+    private var pendingPickerAction: PartPickerAction = PartPickerAction.Add
+
+    private sealed class PartPickerAction {
+        data object Add : PartPickerAction()
+        data class Replace(val partId: String) : PartPickerAction()
+    }
+
     @SuppressLint("SetTextI18n")
     override fun onCreate(
         savedInstanceState: Bundle?
@@ -46,39 +87,33 @@ class ReleaseVideoActivity : AppCompatActivity() {
         binding = ActivityReleaseVideoBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 监听返回按钮点击事件
-        binding.btnBack.setOnClickListener {
-            // 如果已经上传了文件，询问是否删除
-            val uploadInfo = viewModel.videoUploadInfo.value
-            if (uploadInfo != null && uploadInfo.uploadId.isNotEmpty()) {
-                // 已上传文件，自动删除
-                viewModel.deleteUpload(uploadInfo.uploadId)
-                Log.d("ReleaseVideo", "删除已上传的视频文件")
-            }
-            // 退出页面
-            finish()
-        }
+        binding.btnBack.setOnClickListener { requestExitPage() }
 
-        // 获取从 MainActivity 传递过来的视频信息
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                requestExitPage()
+            }
+        })
+
+        setupVideoPartsList()
+
         val videoPath = intent.getStringExtra("video_path")
         val videoDuration = intent.getLongExtra("video_duration", 0)
-
         if (videoPath != null && videoDuration > 0) {
-            // 设置视频信息到 ViewModel
-            viewModel.setVideoInfo(videoPath, videoDuration)
-            Log.d("ReleaseVideo", "接收视频信息: 路径=$videoPath, 时长=${videoDuration/1000}秒")
-
-            // 1. 截取视频第一帧作为封面
-            extractVideoFirstFrame(videoPath)
-
-            // 2. 自动开始上传视频
-            startAutoUpload()
+            viewModel.addPart(videoPath, videoDuration)
         }
 
-        // 添加分片功能，即可以添加上传更多的视频
-//        binding.addShard.setOnClickListener {
-//
-//        }
+        binding.addShard.setOnClickListener {
+            if (viewModel.isAnyPartUploading()) {
+                ToastUtils.showShort(this, getString(R.string.release_wait_upload_finish))
+                return@setOnClickListener
+            }
+            pendingPickerAction = PartPickerAction.Add
+            PermissionHelper.requestPublishVideo(this) { openPartVideoPicker() }
+        }
+        binding.flCoverEntry.setOnClickListener {
+            PermissionHelper.requestGalleryImage(this) { openCoverImagePicker() }
+        }
 
         // 监听标题的输入
         binding.etTitle.doOnTextChanged { text, _, _, _ ->
@@ -112,16 +147,49 @@ class ReleaseVideoActivity : AppCompatActivity() {
         }
 
         binding.btnPublish.setOnClickListener {
+            if (!viewModel.isPublishReady()) {
+                ToastUtils.showShort(this, viewModel.publishBlockReason())
+                return@setOnClickListener
+            }
+            if (viewModel.shouldRetainUploadsOnServer()) {
+                ToastUtils.showShort(this, getString(R.string.release_posting_wait))
+                return@setOnClickListener
+            }
             if (binding.checkboxAgreement.isChecked) {
                 publishVideo()
             } else {
                 showAgreementDialog()
             }
         }
+        updatePublishButtonVisual()
 
-        // 初始状态下禁用投稿按钮，直到上传完成
-        binding.btnPublish.isEnabled = false
-        binding.btnPublish.alpha = 0.5f
+        viewModel.uploadToast.observe(this) { message ->
+            if (!message.isNullOrBlank()) {
+                ToastUtils.showShort(this, message)
+            }
+        }
+
+        viewModel.videoParts.observe(this) { parts ->
+            partAdapter.setParts(parts)
+            applyAutoCoverFromFirstPart(parts)
+            if (parts.size > lastPartCount && parts.isNotEmpty() && !partAdapter.isDragging()) {
+                binding.rvVideoParts.post {
+                    binding.rvVideoParts.smoothScrollToPosition(parts.lastIndex)
+                }
+            }
+            lastPartCount = parts.size
+            updateAddPartButtonState()
+            refreshUploadUi()
+            updatePublishButtonVisual()
+        }
+
+        viewModel.canPublish.observe(this) {
+            updatePublishButtonVisual()
+        }
+
+        viewModel.selectedPartId.observe(this) { selectedId ->
+            partAdapter.setSelectedPartId(selectedId)
+        }
 
         // 监听投稿状态
         viewModel.postStatus.observe(this) { status ->
@@ -181,52 +249,208 @@ class ReleaseVideoActivity : AppCompatActivity() {
             }
         }
 
-        // 监听视频上传进度
-        viewModel.uploadProgress.observe(this) { progress ->
-            binding.progressBarUpload.progress = progress
-            binding.tvUploadProgress.text = "${progress}%"
-            Log.d("ReleaseVideo", "上传进度: $progress%")
+    }
+
+    private fun setupVideoPartsList() {
+        partAdapter = ReleaseVideoPartAdapter(
+            onPartSelected = { part -> viewModel.selectPart(part.id) },
+            onMoreClick = { part, anchor ->
+                viewModel.selectPart(part.id)
+                showPartMenu(part, anchor)
+            },
+        )
+        partItemTouchHelper = ItemTouchHelper(
+            ReleaseVideoPartDragCallback(
+                partAdapter,
+                onMoveSuccess = { from, to ->
+                    viewModel.movePart(from, to)
+                    scrollToPartIfNeeded(to)
+                },
+                onDragEnded = {
+                    partAdapter.setParts(viewModel.videoParts.value.orEmpty())
+                    refreshUploadUi()
+                },
+            ),
+        )
+        binding.rvVideoParts.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.rvVideoParts.adapter = partAdapter
+        // 开启移动动画，让分P交换过程更顺滑
+        binding.rvVideoParts.itemAnimator = DefaultItemAnimator().apply {
+            moveDuration = 140L
+            addDuration = 120L
+            removeDuration = 120L
+            changeDuration = 0L
         }
+        partItemTouchHelper.attachToRecyclerView(binding.rvVideoParts)
+    }
 
-        // 监听上传状态
-        viewModel.uploadStatus.observe(this) { status ->
-            binding.tvUploadStatus.text = status
-
-            // 根据状态显示/隐藏进度条和控制投稿按钮
-            when (status) {
-                "正在初始化上传...", "正在上传分片 1/1", "正在上传分片 1/2" -> {
-                    binding.uploadProgressLayout.visibility = View.VISIBLE
-                    binding.btnPublish.isEnabled = false
-                    binding.btnPublish.alpha = 0.5f
-                }
-                "上传完成" -> {
-                    binding.uploadProgressLayout.visibility = View.VISIBLE
-                    binding.progressBarUpload.progress = 100
-                    binding.tvUploadProgress.text = "100%"
-                    binding.btnPublish.isEnabled = true
-                    binding.btnPublish.alpha = 1.0f
-                }
-                "预上传失败", "上传失败", "分片 1 上传失败" -> {
-                    binding.uploadProgressLayout.visibility = View.VISIBLE
-                    binding.btnPublish.isEnabled = false
-                    binding.btnPublish.alpha = 0.5f
-                }
-                else -> {
-                    // 其他状态保持当前显示状态
-                    // 默认禁用投稿按钮，直到上传完成
-                    binding.btnPublish.isEnabled = false
-                    binding.btnPublish.alpha = 0.5f
-                }
+    private fun refreshUploadUi() {
+        val parts = viewModel.videoParts.value.orEmpty()
+        if (parts.isEmpty()) {
+            binding.topUploadLayout.visibility = View.GONE
+            topProgressAnimator?.cancel()
+            binding.progressBarTopUpload.progress = 0
+            return
+        }
+        val topUploadingPart = viewModel.getTopBarUploadPart()
+        if (topUploadingPart != null) {
+            val partIndex = parts.indexOfFirst { it.id == topUploadingPart.id }
+            val partLabel = if (partIndex >= 0) "P${partIndex + 1}" else ""
+            if (topProgressPartId != topUploadingPart.id) {
+                topProgressPartId = topUploadingPart.id
+                lastTopShownProgress = 0
+                topProgressAnimator?.cancel()
+                binding.progressBarTopUpload.progress = 0
             }
-
-            Log.d("ReleaseVideo", "上传状态: $status")
+            val progress = maxOf(
+                lastTopShownProgress,
+                topUploadingPart.uploadProgress.coerceIn(0, 99),
+            )
+            lastTopShownProgress = progress
+            binding.topUploadLayout.visibility = View.VISIBLE
+            animateTopProgressTo(progress)
+            val labelPrefix = if (partLabel.isNotEmpty()) "$partLabel " else ""
+            binding.tvTopUploadStatus.text = "${labelPrefix}上传中 ${progress}%"
+        } else {
+            topProgressPartId = null
+            lastTopShownProgress = 0
+            binding.topUploadLayout.visibility = View.GONE
+            topProgressAnimator?.cancel()
+            binding.progressBarTopUpload.progress = 0
         }
     }
 
+    private fun animateTopProgressTo(target: Int) {
+        val bar = binding.progressBarTopUpload
+        val safeTarget = target.coerceIn(0, bar.max)
+        val start = bar.progress
+        if (safeTarget == start) return
+        topProgressAnimator?.cancel()
+        if (safeTarget < start) return
+        topProgressAnimator = ObjectAnimator.ofInt(bar, "progress", start, safeTarget).apply {
+            duration = 280L
+            start()
+        }
+    }
+
+    private fun scrollToPartIfNeeded(position: Int) {
+        if (position == RecyclerView.NO_POSITION) return
+        binding.rvVideoParts.post {
+            (binding.rvVideoParts.layoutManager as? LinearLayoutManager)
+                ?.scrollToPositionWithOffset(position, 0)
+        }
+    }
+
+    private fun updateAddPartButtonState() {
+        val uploading = viewModel.isAnyPartUploading()
+        binding.addShard.isEnabled = !uploading
+        binding.addShard.alpha = if (uploading) 0.45f else 1f
+    }
+
     /**
-     * 截取视频第一帧作为封面
+     * 显示分p设置
      */
-    private fun extractVideoFirstFrame(videoPath: String) {
+    private fun showPartMenu(part: ReleaseVideoPart, anchor: View) {
+        // 1. 使用 ViewBinding 直接“充气”加载菜单布局
+        val menuBinding = LayoutPartMoreMenuBinding.inflate(layoutInflater)
+        val contentView = menuBinding.root
+
+        // 2. 强行触发后台测量（宽度死锁 120dp，高度根据内容自动算）
+        contentView.measure(
+            View.MeasureSpec.makeMeasureSpec(160.dp, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+
+        // 3. 实例化弹窗，直接用测量好的精确宽高
+        val popupWindow = PopupWindow(
+            contentView,
+            contentView.measuredWidth,
+            contentView.measuredHeight,
+            true,
+        ).apply {
+            // 启动点击气泡外会关闭气泡
+            isOutsideTouchable = true
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            elevation = 8.dp.toFloat()
+        }
+        popupWindow.setOnDismissListener { hidePartMenuDim() }
+
+        // 替换视频
+        menuBinding.actionReplaceVideo.setOnClickListener {
+            popupWindow.dismiss()
+            pendingPickerAction = PartPickerAction.Replace(part.id)
+            PermissionHelper.requestPublishVideo(this) { openPartVideoPicker() }
+        }
+
+        // 修改标题
+        menuBinding.actionEditTitle.setOnClickListener {
+            popupWindow.dismiss()
+            PartTitleBottomSheetDialogFragment
+                .newInstance(
+                    part.id,
+                    part.displayTitle.take(resources.getInteger(R.integer.release_part_title_max_length)),
+                )
+                .show(supportFragmentManager, "PartTitleBottomSheet")
+        }
+
+        // 删除该视频
+        menuBinding.actionDeletePart.setOnClickListener {
+            popupWindow.dismiss()
+            if (!viewModel.removePart(part.id)) {
+                ToastUtils.showShort(this, getString(R.string.release_part_keep_one))
+            }
+        }
+
+        // 5. 精准计算坐标并把它贴在三个点按钮下方
+        val popupWidth = contentView.measuredWidth
+        val xOffset = -(popupWidth - anchor.width - 10.dp)
+        showPartMenuDim(popupWindow)
+        popupWindow.showAsDropDown(anchor, xOffset, 6.dp)
+    }
+
+    /**
+     * 给气泡菜单添加全屏变暗遮罩（点击遮罩也可关闭气泡）
+     */
+    private fun showPartMenuDim(popupWindow: PopupWindow) {
+        if (partMenuDimView != null) return
+        // 获取根布局容器
+        val container = window.decorView.findViewById<ViewGroup>(android.R.id.content) ?: return
+        // 创建全屏view视图
+        val dimView = View(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+            setBackgroundColor(Color.parseColor("#66000000"))
+            alpha = 0f
+            isClickable = true
+            setOnClickListener { popupWindow.dismiss() }
+        }
+        container.addView(dimView)
+        dimView.animate().alpha(1f).setDuration(120L).start()
+        partMenuDimView = dimView
+    }
+
+    private fun hidePartMenuDim() {
+        val dimView = partMenuDimView ?: return
+        val parent = dimView.parent as? ViewGroup
+        parent?.removeView(dimView)
+        partMenuDimView = null
+    }
+
+    private fun updateCoverPreview(videoPath: String) {
+        try {
+            val bitmap = VideoThumbnailUtil.getFirstFrameBitmap(videoPath)
+            if (bitmap != null) {
+                binding.ivVideoCover.setImageBitmap(bitmap)
+            }
+        } catch (e: Exception) {
+            Log.e("ReleaseVideo", "更新封面预览失败", e)
+        }
+    }
+
+    private fun extractAndUploadCover(videoPath: String) {
         try {
             // 使用VideoThumbnailUtil获取第一帧并保存为文件
             val coverImagePath = VideoThumbnailUtil.getFirstFrame(this, videoPath)
@@ -244,6 +468,41 @@ class ReleaseVideoActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e("ReleaseVideo", "截取视频第一帧失败", e)
         }
+    }
+
+    /**
+     * 默认封面逻辑：只在首次有分P时初始化一次，后续拖拽/删除不自动改封面
+     */
+    private fun applyAutoCoverFromFirstPart(parts: List<ReleaseVideoPart>) {
+        if (hasCustomCover || hasInitDefaultCover) return
+        val firstPartPath = parts.firstOrNull()?.filePath ?: return
+        hasInitDefaultCover = true
+        extractAndUploadCover(firstPartPath)
+    }
+
+    private fun openCoverImagePicker() {
+        PictureSelector.create(this)
+            .openGallery(SelectMimeType.ofImage())
+            .setImageEngine(GlideEngine)
+            .setSelectionMode(SelectModeConfig.SINGLE)
+            .setMaxSelectNum(1)
+            .isDisplayCamera(true)
+            .isPreviewVideo(false)
+            .isPreviewImage(false)
+            .isPreviewAudio(false)
+            .forResult(object : OnResultCallbackListener<LocalMedia> {
+                override fun onResult(result: ArrayList<LocalMedia>?) {
+                    val media = result?.getOrNull(0) ?: return
+                    val imagePath = media.realPath
+                    hasCustomCover = true
+                    binding.ivVideoCover.setImageURI(android.net.Uri.parse(imagePath))
+                    uploadCoverImage(imagePath)
+                }
+
+                override fun onCancel() {
+                    Log.d("ReleaseVideo", "取消选择自定义封面")
+                }
+            })
     }
 
     /**
@@ -305,17 +564,6 @@ class ReleaseVideoActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * 自动开始上传视频
-     */
-    private fun startAutoUpload() {
-        // 延迟1秒后开始上传，给用户一些时间看到界面
-        binding.root.postDelayed({
-            viewModel.startVideoUpload()
-            Log.d("ReleaseVideo", "开始自动上传视频")
-        }, 1000)
-    }
-
     private fun showTagsAndPartition() {
         val tagSheet = TagBottomSheetDialogFragment()
 
@@ -324,8 +572,73 @@ class ReleaseVideoActivity : AppCompatActivity() {
         tagSheet.show(supportFragmentManager, "TagSheet")
     }
 
+    private fun openPartVideoPicker() {
+        PictureSelector.create(this)
+            .openGallery(SelectMimeType.ofVideo())
+            .setImageEngine(GlideEngine)
+            .setSelectionMode(SelectModeConfig.SINGLE)
+            .setMaxSelectNum(1)
+            .isDisplayCamera(true)
+            .isPreviewVideo(false)
+            .isPreviewImage(false)
+            .isPreviewAudio(false)
+            .forResult(object : OnResultCallbackListener<LocalMedia> {
+                override fun onResult(result: ArrayList<LocalMedia>?) {
+                    val media = result?.getOrNull(0) ?: return
+                    val videoPath = media.realPath
+                    val duration = media.duration
+                    when (val action = pendingPickerAction) {
+                        PartPickerAction.Add -> {
+                            viewModel.addPart(videoPath, duration)
+                        }
+                        is PartPickerAction.Replace -> {
+                            viewModel.replacePart(action.partId, videoPath, duration)
+                        }
+                    }
+                }
+
+                override fun onCancel() {
+                    Log.d("ReleaseVideo", "取消添加分P视频")
+                }
+            })
+    }
+
     private fun publishVideo() {
         viewModel.postVideo()
+    }
+
+    /** 灰色仅作提示，按钮保持可点以便弹出原因 Toast（disabled 的 Button 收不到点击） */
+    private fun updatePublishButtonVisual() {
+        val ready = viewModel.isPublishReady()
+        binding.btnPublish.isEnabled = true
+        binding.btnPublish.isClickable = true
+        binding.btnPublish.alpha = if (ready) 1f else 0.5f
+        Log.d("ReleaseVideo", "publishReady=$ready, ${viewModel.publishBlockReason()}")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updatePublishButtonVisual()
+    }
+
+    private fun requestExitPage() {
+        if (viewModel.shouldRetainUploadsOnServer()) {
+            finish()
+            return
+        }
+        val hasUploads = viewModel.videoParts.value.orEmpty().any { it.uploadId.isNotEmpty() }
+        if (!hasUploads) {
+            finish()
+            return
+        }
+        AlertDialog.Builder(this, R.style.PinkDialogTheme)
+            .setMessage(R.string.release_exit_confirm)
+            .setPositiveButton(R.string.confirm) { _, _ ->
+                viewModel.deleteAllUploads()
+                finish()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     /**

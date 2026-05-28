@@ -2,14 +2,15 @@ package com.example.bilibili.ui.releaseVideo
 
 import android.app.Application
 import android.util.Log
+import android.os.Looper
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.example.bilibili.data.api.FileService
 import com.example.bilibili.data.api.PostService
 import com.example.bilibili.data.model.CategoryInfo
-import com.example.bilibili.data.model.VideoInfoFilePost
-import com.example.bilibili.data.model.VideoUploadInfo
+import com.example.bilibili.data.model.ReleaseVideoPart
+import com.example.bilibili.util.ApiResponseHelper
 import com.example.bilibili.util.RetrofitClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -21,339 +22,511 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-class ReleaseVideoViewModel(application: Application): AndroidViewModel(application) {
+class ReleaseVideoViewModel(application: Application) : AndroidViewModel(application) {
 
-    // 使用 MutableLiveData 存储标签列表
     val selectedTags = MutableLiveData<MutableList<String>>(mutableListOf())
-
-    // 存储选择的分区（给个初始默认值，比如图片里显示的"动物"）
     val selectedPartition = MutableLiveData<CategoryInfo>()
-
-    // 视频上传信息
-    val videoUploadInfo = MutableLiveData<VideoUploadInfo>()
-
-    // 上传进度
     val uploadProgress = MutableLiveData<Int>()
-
-    // 上传状态
     val uploadStatus = MutableLiveData<String>()
-
-    // 视频标题
     val videoTitle = MutableLiveData("")
-
-    // 视频封面URL
-    val videoCoverUrl = MutableLiveData("default_cover.jpg") // 暂时使用默认封面
-
-    // 简介
+    val videoCoverUrl = MutableLiveData("default_cover.jpg")
     val introduction = MutableLiveData("")
-
-    // 创作声明类型
-    enum class StatementType {
-        ORIGINAL,  // 自制
-        REPOST     // 转载
-    }
-
-    // 创作声明类型
-    val statementType = MutableLiveData<StatementType>(StatementType.ORIGINAL)
-
-    // 转载来源
+    val statementType = MutableLiveData(StatementType.ORIGINAL)
     val repostSource = MutableLiveData("")
-
-    // 投稿状态
     val postStatus = MutableLiveData("")
 
-    // 更新分区的方法
+    val videoParts = MutableLiveData<List<ReleaseVideoPart>>(emptyList())
+    val selectedPartId = MutableLiveData<String?>()
+    val canPublish = MutableLiveData(false)
+    val uploadToast = MutableLiveData<String?>()
+
+    /** 顶部进度条跟随的分 P（最近一次上报进度的正在上传分 P） */
+    private var activeTopBarPartId: String? = null
+    private val partsLock = Any()
+    /** 分 P 列表权威数据源（IO 线程 upload 时不能用 videoParts.value，postValue 不会立刻反映到后台） */
+    private var partsSnapshot: List<ReleaseVideoPart> = emptyList()
+    /** 服务端已确认全部分片上传成功的分 P */
+    private val uploadFinishedPartIds = mutableSetOf<String>()
+    @Volatile
+    private var isPosting = false
+    /** 投稿已提交：不可再调 delUploadVideo，避免后端转码读不到 Redis */
+    @Volatile
+    private var postSubmitted = false
+
+    enum class StatementType {
+        ORIGINAL,
+        REPOST,
+    }
+
+    fun shouldRetainUploadsOnServer(): Boolean = isPosting || postSubmitted
+
     fun updatePartition(categoryInfo: CategoryInfo) {
         selectedPartition.value = categoryInfo
     }
 
-    // 添加标签的方法
     fun addTag(name: String) {
         val current = selectedTags.value ?: mutableListOf()
-        // 限制最多 10 个，且不重复
         if (current.size < 10 && !current.contains(name)) {
             current.add(name)
-            selectedTags.value = current // 重新赋值以触发 LiveData 观察者
+            selectedTags.value = current
         }
     }
 
-    // 移除标签的方法
     fun removeTag(name: String) {
         val current = selectedTags.value ?: mutableListOf()
         current.remove(name)
         selectedTags.value = current
     }
 
-    // 设置简介
     fun setIntroduction(text: String) {
         introduction.value = text
     }
 
-    // 设置创作声明类型
     fun setStatementType(type: StatementType) {
         statementType.value = type
     }
 
-    // 设置转载来源
     fun setRepostSource(source: String) {
         repostSource.value = source
     }
 
-    // 设置视频标题
     fun setVideoTitle(title: String) {
         videoTitle.value = title
     }
 
-    // 设置视频封面URL
     fun setVideoCoverUrl(url: String) {
         videoCoverUrl.value = url
     }
 
-    /**
-     * 投稿视频
-     */
+    fun addPart(filePath: String, duration: Long): ReleaseVideoPart {
+        val file = File(filePath)
+        val part = ReleaseVideoPart(
+            filePath = filePath,
+            fileName = file.name,
+            duration = duration,
+            displayTitle = file.nameWithoutExtension.ifBlank { file.name },
+        )
+        val newList = currentParts() + part
+        publishParts(newList, selectId = part.id)
+        startUploadForPart(part.id)
+        return part
+    }
+
+    fun replacePart(partId: String, filePath: String, duration: Long) {
+        val file = File(filePath)
+        val oldPart = currentParts().find { it.id == partId } ?: return
+        synchronized(partsLock) {
+            uploadFinishedPartIds.remove(partId)
+        }
+        if (oldPart.uploadId.isNotEmpty() && !postSubmitted) {
+            deleteUpload(oldPart.uploadId)
+        }
+        val updated = ReleaseVideoPart(
+            id = partId,
+            filePath = filePath,
+            fileName = file.name,
+            duration = duration,
+            displayTitle = file.nameWithoutExtension.ifBlank { file.name },
+        )
+        val newList = currentParts().map { if (it.id == partId) updated else it }
+        publishParts(newList, selectId = partId)
+        startUploadForPart(partId)
+    }
+
+    fun removePart(partId: String): Boolean {
+        val current = currentParts()
+        if (current.size <= 1) return false
+        val removed = current.find { it.id == partId } ?: return false
+        synchronized(partsLock) {
+            uploadFinishedPartIds.remove(partId)
+        }
+        if (removed.uploadId.isNotEmpty() && !postSubmitted) {
+            deleteUpload(removed.uploadId)
+        }
+        val newList = current.filter { it.id != partId }
+        val nextSelected = if (selectedPartId.value == partId) {
+            newList.firstOrNull()?.id
+        } else {
+            selectedPartId.value
+        }
+        publishParts(newList, selectId = nextSelected)
+        return true
+    }
+
+    fun movePart(from: Int, to: Int) {
+        val list = currentParts().toMutableList()
+        if (from !in list.indices || to !in list.indices || from == to) return
+        val item = list.removeAt(from)
+        list.add(to, item)
+        publishParts(list, selectId = selectedPartId.value)
+    }
+
+    fun updatePartTitle(partId: String, title: String) {
+        val newList = currentParts().map { part ->
+            if (part.id == partId) part.copy(displayTitle = title) else part
+        }
+        publishParts(newList, selectId = partId)
+    }
+
+    fun selectPart(partId: String) {
+        selectedPartId.value = partId
+    }
+
+    fun getSelectedPart(): ReleaseVideoPart? {
+        val id = selectedPartId.value ?: return videoParts.value?.firstOrNull()
+        return videoParts.value?.find { it.id == id } ?: videoParts.value?.firstOrNull()
+    }
+
+    private fun currentParts(): List<ReleaseVideoPart> = synchronized(partsLock) {
+        partsSnapshot.ifEmpty { videoParts.value.orEmpty() }
+    }
+
+    fun allPartsUploaded(): Boolean {
+        val parts = currentParts()
+        return parts.isNotEmpty() && parts.all { isPartUploadComplete(it) }
+    }
+
+    private fun isPartUploadComplete(part: ReleaseVideoPart): Boolean {
+        if (part.uploadId.isEmpty()) return false
+        if (part.uploadStatus.contains("失败") || part.uploadStatus.contains("预上传失败")) return false
+        if (part.uploadStatus.startsWith("正在")) return false
+        if (synchronized(partsLock) { uploadFinishedPartIds.contains(part.id) }) return true
+        if (part.uploadStatus == "上传完成") return true
+        return part.uploadProgress >= 100
+    }
+
+    fun isPublishReady(): Boolean = !postSubmitted && !isPosting && allPartsUploaded()
+
+    private fun reconcileUploadFinished(parts: List<ReleaseVideoPart>) {
+        synchronized(partsLock) {
+            parts.forEach { part ->
+                if (part.uploadStatus == "上传完成" &&
+                    part.uploadId.isNotEmpty() &&
+                    !part.uploadStatus.contains("失败")
+                ) {
+                    uploadFinishedPartIds.add(part.id)
+                }
+            }
+        }
+    }
+
+    fun publishBlockReason(): String {
+        if (postSubmitted) return "视频已投稿"
+        if (isPosting) return "正在投稿，请稍候"
+        val parts = currentParts()
+        if (parts.isEmpty()) return "请先添加分P视频"
+        parts.firstOrNull { it.uploadStatus.contains("失败") || it.uploadStatus.contains("预上传失败") }
+            ?.let { return it.uploadStatus }
+        if (parts.any { it.uploadStatus.startsWith("正在") }) return "正在上传，请稍候"
+        parts.firstOrNull { !isPartUploadComplete(it) }?.let { part ->
+            val status = part.uploadStatus.ifBlank { "未开始" }
+            if (part.uploadId.isEmpty()) {
+                return if (status != "未开始") status else "「${part.shortFileName()}」上传未就绪，请稍候或重新添加"
+            }
+            return "「${part.shortFileName()}」未完成上传（$status）"
+        }
+        return "可以发布"
+    }
+
+    fun isAnyPartUploading(): Boolean {
+        return videoParts.value.orEmpty().any { part ->
+            part.uploadStatus.startsWith("正在")
+        }
+    }
+
+    fun getTopBarUploadPart(): ReleaseVideoPart? {
+        val parts = videoParts.value.orEmpty()
+        val active = activeTopBarPartId?.let { id -> parts.find { it.id == id } }
+        if (active != null && isPartUploading(active)) return active
+        return parts.lastOrNull { isPartUploading(it) }
+    }
+
+    private fun isPartUploading(part: ReleaseVideoPart): Boolean {
+        if (isPartUploadComplete(part)) return false
+        if (part.uploadStatus.contains("失败")) return false
+        return part.uploadStatus.startsWith("正在")
+    }
+
+    private fun refreshActiveTopBarPartId(partId: String, updated: ReleaseVideoPart) {
+        if (isPartUploading(updated)) {
+            activeTopBarPartId = partId
+            return
+        }
+        if (activeTopBarPartId == partId) {
+            activeTopBarPartId = videoParts.value.orEmpty().lastOrNull { isPartUploading(it) }?.id
+        }
+    }
+
     fun postVideo() {
-        val uploadInfo = videoUploadInfo.value
+        if (isPosting) return
+        val parts = videoParts.value.orEmpty()
         val partition = selectedPartition.value
         val tags = selectedTags.value ?: mutableListOf()
 
-        // 验证必要数据
-        if (uploadInfo == null) {
-            Log.e("PostVideo", "上传信息为空")
-            postStatus.postValue("视频未上传完成")
+        if (parts.isEmpty()) {
+            postStatus.postValue("请先添加分P视频")
             return
         }
-
-        if (uploadInfo.uploadId.isEmpty()) {
-            Log.e("PostVideo", "uploadId 为空，视频可能未成功上传")
-            postStatus.postValue("视频上传未完成，请等待上传完成后再投稿")
+        if (!allPartsUploaded()) {
+            postStatus.postValue("请等待所有分P上传完成")
             return
         }
-
         if (partition == null) {
             postStatus.postValue("请选择分区")
             return
         }
-
         if (videoTitle.value.isNullOrEmpty()) {
             postStatus.postValue("请输入视频标题")
             return
         }
-
         if (tags.isEmpty()) {
             postStatus.postValue("请至少添加一个标签")
             return
         }
 
+        isPosting = true
+        canPublish.postValue(false)
+
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val postService = RetrofitClient.create(PostService::class.java)
-
-                Log.d("PostVideo", "开始投稿视频")
-                Log.d("PostVideo", "上传信息 - uploadId: ${uploadInfo.uploadId}, fileName: ${uploadInfo.fileName}")
-
-                // 构建视频文件信息列表
-                val videoFileList = listOf(
-                    VideoInfoFilePost(
-                        uploadId = uploadInfo.uploadId,
-                        fileName = uploadInfo.fileName,
-                        fileSize = uploadInfo.fileSize,
-                        duration = (uploadInfo.duration / 1000).toInt() // 转换为秒
-                    )
-                )
-
-                // 使用 org.json 转换为JSON字符串
                 val jsonArray = JSONArray()
-
-                videoFileList.forEach { file ->
+                parts.forEach { part ->
+                    if (!isPartUploadComplete(part)) {
+                        throw IllegalStateException("分P「${part.displayTitle}」未完成上传")
+                    }
                     val fileJson = JSONObject().apply {
-                        put("uploadId", file.uploadId)
-                        put("fileName", file.fileName)
-                        put("fileSize", file.fileSize)
-                        put("duration", file.duration)
-                        put("fileMd5", file.fileMd5)
+                        put("uploadId", part.uploadId)
+                        put("fileName", part.fileName)
+                        put("fileSize", File(part.filePath).length())
+                        put("duration", (part.duration / 1000).toInt())
                     }
                     jsonArray.put(fileJson)
                 }
-                val uploadFileListJson = jsonArray.toString()
-
-                Log.d("PostVideo", "uploadFileList JSON: $uploadFileListJson")
-
-                // 转换标签为逗号分隔的字符串
-                val tagsString = tags.joinToString(",")
-
-                // 确定投稿类型：0-自制，1-转载
-                val postType = if (statementType.value == StatementType.ORIGINAL) 0 else 1
-
-                Log.d("PostVideo", "投稿参数 - 标题: ${videoTitle.value}, 分区: ${partition.categoryName}, 标签: $tagsString")
-
-                // 调用投稿接口
                 val response = postService.postVideo(
-                    videoId = null, // 新投稿不传videoId
+                    videoId = null,
                     videoCover = videoCoverUrl.value ?: "",
                     videoName = videoTitle.value ?: "",
-                    pCategoryId = partition.categoryId, // 使用一级分类ID
+                    pCategoryId = partition.categoryId,
                     categoryId = partition.subCategoryId,
-                    postType = postType,
-                    tags = tagsString,
+                    postType = if (statementType.value == StatementType.ORIGINAL) 0 else 1,
+                    tags = tags.joinToString(","),
                     introduction = introduction.value ?: "",
-                    interaction = "", // 互动设置暂时为空
-                    uploadFileList = uploadFileListJson
+                    interaction = "",
+                    uploadFileList = jsonArray.toString(),
                 )
-
-                Log.d("PostVideo", "投稿结果: $response")
-
-                // 解析响应
-                val responseJson = JSONObject(response)
-                if (responseJson.optString("status") == "success") {
+                if (ApiResponseHelper.isSuccess(response)) {
+                    postSubmitted = true
                     postStatus.postValue("投稿成功")
-                    // 可以在这里清空上传信息或进行其他后续处理
                 } else {
-                    postStatus.postValue("投稿失败: ${responseJson.optString("message")}")
+                    postStatus.postValue("投稿失败: ${ApiResponseHelper.errorMessage(response)}")
                 }
-
             } catch (e: Exception) {
-                Log.e("PostVideo", "投稿失败", e)
+                Log.e("ReleaseVideo", "投稿失败", e)
                 postStatus.postValue("投稿失败: ${e.message}")
+            } finally {
+                isPosting = false
+                canPublish.postValue(allPartsUploaded() && !postSubmitted)
             }
         }
     }
 
-    // 设置视频文件信息
+    @Deprecated("Use addPart")
     fun setVideoInfo(filePath: String, duration: Long) {
-        val file = File(filePath)
-        val fileName = file.name
-        val fileSize = file.length()
-
-        // 计算分片数量（每个分片 5MB）
-        val chunkSize = 5 * 1024 * 1024L // 5MB
-        val chunks = ((fileSize + chunkSize - 1) / chunkSize).toInt()
-
-        val uploadInfo = VideoUploadInfo(
-            uploadId = "",
-            fileName = fileName,
-            filePath = filePath,
-            fileSize = fileSize,
-            duration = duration,
-            chunks = chunks,
-            currentChunk = 0
-        )
-
-        videoUploadInfo.value = uploadInfo
+        addPart(filePath, duration)
     }
 
-    // 开始上传视频
+    @Deprecated("Upload starts in addPart")
     fun startVideoUpload() {
-        val uploadInfo = videoUploadInfo.value ?: return
+        videoParts.value?.firstOrNull()?.let { startUploadForPart(it.id) }
+    }
 
+    fun startUploadForPart(partId: String) {
+        val part = currentParts().find { it.id == partId } ?: return
+        synchronized(partsLock) {
+            uploadFinishedPartIds.remove(partId)
+        }
+        activeTopBarPartId = partId
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val fileService = RetrofitClient.create(FileService::class.java)
+                val file = File(part.filePath)
+                val totalBytes = file.length().coerceAtLeast(1L)
+                val targetChunks = 12L
+                val minChunkSize = 256 * 1024L
+                val maxChunkSize = 2 * 1024 * 1024L
+                val chunkSize = ((totalBytes + targetChunks - 1) / targetChunks)
+                    .coerceIn(minChunkSize, maxChunkSize)
+                val chunks = ((totalBytes + chunkSize - 1) / chunkSize).toInt().coerceAtLeast(1)
 
-                // 1. 预上传，获取 uploadId
-                Log.d("VideoUpload", "开始预上传: ${uploadInfo.fileName}")
-                uploadStatus.postValue("正在初始化上传...")
-                val preUploadResponse = fileService.preUploadVideo(uploadInfo.fileName, uploadInfo.chunks)
-                val preUploadJson = JSONObject(preUploadResponse)
+                updatePart(partId) { it.copy(uploadStatus = "正在初始化上传...", uploadProgress = 0) }
+                syncGlobalUploadUi(partId)
 
-                if (preUploadJson.optString("status") == "success") {
-                    val uploadId = preUploadJson.optString("data")
-                    Log.d("VideoUpload", "获取到 uploadId: $uploadId")
+                val preUploadResponse = fileService.preUploadVideo(part.fileName, chunks)
+                if (!ApiResponseHelper.isSuccess(preUploadResponse)) {
+                    failPartUpload(partId, "预上传失败: ${ApiResponseHelper.errorMessage(preUploadResponse)}")
+                    return@launch
+                }
+                val uploadId = ApiResponseHelper.successData(preUploadResponse)
+                if (uploadId.isBlank()) {
+                    failPartUpload(partId, "预上传失败: 未返回 uploadId")
+                    return@launch
+                }
+                updatePart(partId) { it.copy(uploadId = uploadId) }
+                Log.d("ReleaseVideo", "preUpload ok partId=$partId uploadId=$uploadId")
 
-                    // 更新 uploadId
-                    uploadInfo.uploadId = uploadId
-                    videoUploadInfo.postValue(uploadInfo)
+                for (chunkIndex in 0 until chunks) {
+                    updatePart(partId) {
+                        it.copy(uploadStatus = "正在上传分片 ${chunkIndex + 1}/$chunks")
+                    }
+                    syncGlobalUploadUi(partId)
 
-                    // 2. 分片上传
-                    uploadVideoChunks(fileService, uploadInfo)
+                    val startPos = chunkIndex * chunkSize
+                    val endPos = (startPos + chunkSize).coerceAtMost(file.length())
+                    val chunkLength = (endPos - startPos).toInt()
+                    val chunkData = ByteArray(chunkLength)
+                    file.inputStream().use { input ->
+                        input.skip(startPos)
+                        input.read(chunkData)
+                    }
+                    val chunkFile = File.createTempFile("chunk_$chunkIndex", ".tmp", null)
+                    try {
+                        chunkFile.writeBytes(chunkData)
+                        val requestBody = chunkFile.asRequestBody("video/mp4".toMediaTypeOrNull())
+                        val chunkPart = MultipartBody.Part.createFormData(
+                            "chunkFile",
+                            chunkFile.name,
+                            requestBody,
+                        )
+                        val chunkResponse = fileService.uploadVideo(
+                            chunkPart,
+                            chunkIndex.toString().toRequestBody("text/plain".toMediaTypeOrNull()),
+                            uploadId.toRequestBody("text/plain".toMediaTypeOrNull()),
+                        )
+                        if (!ApiResponseHelper.isSuccess(chunkResponse)) {
+                            failPartUpload(
+                                partId,
+                                "分片 ${chunkIndex + 1} 失败: ${ApiResponseHelper.errorMessage(chunkResponse)}",
+                            )
+                            return@launch
+                        }
+                    } finally {
+                        chunkFile.delete()
+                    }
 
-                } else {
-                    Log.e("VideoUpload", "预上传失败: $preUploadResponse")
-                    // 清空 uploadId 防止提交空值
-                    uploadInfo.uploadId = ""
-                    videoUploadInfo.postValue(uploadInfo)
-                    uploadStatus.postValue("预上传失败")
+                    val progress = ((chunkIndex + 1) * 100) / chunks
+                    updatePart(partId) { it.copy(uploadProgress = progress) }
+                    syncGlobalUploadUi(partId)
                 }
 
+                synchronized(partsLock) {
+                    uploadFinishedPartIds.add(partId)
+                }
+                updatePart(partId) { it.copy(uploadStatus = "上传完成", uploadProgress = 100) }
+                syncGlobalUploadUi(partId)
             } catch (e: Exception) {
-                Log.e("VideoUpload", "上传失败", e)
-                // 清空 uploadId 防止提交空值
-                uploadInfo.uploadId = ""
-                videoUploadInfo.postValue(uploadInfo)
-                uploadStatus.postValue("上传失败: ${e.message}")
+                Log.e("VideoUpload", "分P上传失败", e)
+                failPartUpload(partId, "上传失败: ${e.message}")
             }
         }
     }
 
-    // 分片上传
-    private suspend fun uploadVideoChunks(fileService: FileService, uploadInfo: VideoUploadInfo) {
-        val file = File(uploadInfo.filePath)
-        val chunkSize = 5 * 1024 * 1024L // 5MB
-
-        for (chunkIndex in 0 until uploadInfo.chunks) {
-            try {
-                // 读取分片数据
-                val startPos = chunkIndex * chunkSize
-                val endPos = (startPos + chunkSize).coerceAtMost(file.length())
-                val chunkLength = (endPos - startPos).toInt()
-
-                val chunkData = ByteArray(chunkLength)
-                file.inputStream().use { inputStream ->
-                    inputStream.skip(startPos)
-                    inputStream.read(chunkData)
-                }
-
-                // 创建分片文件
-                val chunkFile = File.createTempFile("chunk_$chunkIndex", ".tmp", null)
-                // 将分片数据(chunkData)写入到临时文件(chunkFile)中
-                chunkFile.writeBytes(chunkData)
-
-                // 准备上传参数
-                val requestBody = chunkFile.asRequestBody("video/mp4".toMediaTypeOrNull())
-                val chunkPart = MultipartBody.Part.createFormData("chunkFile", chunkFile.name, requestBody)
-
-                val chunkIndexBody = chunkIndex.toString().toRequestBody("text/plain".toMediaTypeOrNull())
-                val uploadIdBody = uploadInfo.uploadId.toRequestBody("text/plain".toMediaTypeOrNull())
-
-                Log.d("VideoUpload", "上传分片 $chunkIndex/${uploadInfo.chunks}")
-                uploadStatus.postValue("正在上传分片 $chunkIndex/${uploadInfo.chunks}")
-
-                // 上传分片
-                val response = fileService.uploadVideo(chunkPart, chunkIndexBody, uploadIdBody)
-                Log.d("VideoUpload", "分片 $chunkIndex 上传结果: $response")
-
-                // 更新进度
-                val progress = ((chunkIndex + 1) * 100) / uploadInfo.chunks
-                uploadProgress.postValue(progress)
-
-                // 清理临时文件
-                chunkFile.delete()
-
-            } catch (e: Exception) {
-                Log.e("VideoUpload", "分片 $chunkIndex 上传失败", e)
-                // 清空 uploadId 防止提交空值
-                uploadInfo.uploadId = ""
-                videoUploadInfo.postValue(uploadInfo)
-                uploadStatus.postValue("分片 $chunkIndex 上传失败")
-                // 停止继续上传其他分片
-                break
-            }
+    private fun failPartUpload(partId: String, message: String) {
+        synchronized(partsLock) {
+            uploadFinishedPartIds.remove(partId)
         }
-
-        Log.d("VideoUpload", "所有分片上传完成")
-        uploadStatus.postValue("上传完成")
+        updatePart(partId) {
+            it.copy(uploadId = "", uploadStatus = message, uploadProgress = 0)
+        }
+        syncGlobalUploadUi(partId)
+        uploadToast.postValue(message)
     }
 
-    // 删除上传
+    fun deleteAllUploads() {
+        if (shouldRetainUploadsOnServer()) {
+            Log.w("ReleaseVideo", "跳过删除上传：投稿进行中或已提交")
+            return
+        }
+        currentParts().forEach { part ->
+            if (part.uploadId.isNotEmpty()) {
+                deleteUpload(part.uploadId)
+            }
+        }
+    }
+
     fun deleteUpload(uploadId: String) {
+        if (uploadId.isEmpty() || postSubmitted) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val fileService = RetrofitClient.create(FileService::class.java)
                 val response = fileService.deleteUpload(uploadId)
-                Log.d("VideoUpload", "删除上传结果: $response")
+                if (!ApiResponseHelper.isSuccess(response)) {
+                    Log.w("ReleaseVideo", "删除上传失败: ${ApiResponseHelper.errorMessage(response)}")
+                }
             } catch (e: Exception) {
                 Log.e("VideoUpload", "删除上传失败", e)
             }
         }
+    }
+
+    private fun publishParts(parts: List<ReleaseVideoPart>, selectId: String?) {
+        val indexed = parts.mapIndexed { index, part ->
+            part.copy().apply { displayIndex = index + 1 }
+        }
+        emitParts(indexed, selectId)
+    }
+
+    private fun updatePart(partId: String, block: (ReleaseVideoPart) -> ReleaseVideoPart) {
+        val indexed = synchronized(partsLock) {
+            val currentList = partsSnapshot.ifEmpty { videoParts.value.orEmpty() }
+            val current = currentList.find { it.id == partId } ?: return@synchronized null
+            val updated = block(current)
+            if (updated.uploadProgress < current.uploadProgress &&
+                updated.uploadStatus == current.uploadStatus &&
+                updated.uploadId == current.uploadId
+            ) {
+                return@synchronized null
+            }
+            refreshActiveTopBarPartId(partId, updated)
+            currentList.map { part ->
+                if (part.id == partId) updated else part
+            }.mapIndexed { index, part ->
+                part.copy().apply { displayIndex = index + 1 }
+            }
+        } ?: return
+        emitParts(indexed, selectId = null)
+    }
+
+    private fun emitParts(indexed: List<ReleaseVideoPart>, selectId: String?) {
+        synchronized(partsLock) {
+            partsSnapshot = indexed
+            reconcileUploadFinished(indexed)
+        }
+        val ready = !postSubmitted && indexed.isNotEmpty() && indexed.all { isPartUploadComplete(it) }
+        val onMain = Looper.myLooper() == Looper.getMainLooper()
+        if (onMain) {
+            videoParts.value = indexed
+            canPublish.value = ready && !isPosting
+            if (selectId != null) {
+                selectedPartId.value = selectId
+            } else if (selectedPartId.value == null && indexed.isNotEmpty()) {
+                selectedPartId.value = indexed.first().id
+            }
+        } else {
+            videoParts.postValue(indexed)
+            canPublish.postValue(ready && !isPosting)
+            if (selectId != null) {
+                selectedPartId.postValue(selectId)
+            } else if (selectedPartId.value == null && indexed.isNotEmpty()) {
+                selectedPartId.postValue(indexed.first().id)
+            }
+        }
+    }
+
+    private fun syncGlobalUploadUi(partId: String) {
+        if (selectedPartId.value != partId && currentParts().firstOrNull()?.id != partId) return
+        val part = currentParts().find { it.id == partId } ?: return
+        uploadProgress.postValue(part.uploadProgress)
+        uploadStatus.postValue(part.uploadStatus)
     }
 }

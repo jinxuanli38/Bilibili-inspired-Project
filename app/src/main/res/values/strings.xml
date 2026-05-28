@@ -73,6 +73,18 @@
     <string name="message_title">消息</string>
     <string name="message_back">返回</string>
     <string name="message_clear">清除消息</string>
+    <string name="message_mark_all_read">一键标为已读</string>
+    <string name="release_part_replace_video">替换视频</string>
+    <string name="release_part_edit_title">修改标题</string>
+    <string name="release_part_delete">删除</string>
+    <string name="release_part_keep_one">至少保留 1 个分P</string>
+    <string name="release_edit_cover">修改封面</string>
+    <string name="release_part_title_hint">输入分P标题</string>
+    <string name="release_part_edit_sheet_title">修改分P标题</string>
+    <string name="release_part_title_limit">最多 40 字</string>
+    <string name="release_wait_upload_finish">当前分P上传中，请等待完成后再添加</string>
+    <string name="release_exit_confirm">退出将删除未发布的上传文件，确定退出吗？</string>
+    <string name="release_posting_wait">正在投稿，请稍候</string>
     <string name="message_quick_reply">回复与@</string>
     <string name="message_quick_like">收到喜欢</string>
     <string name="message_quick_fans">新增粉丝</string>
@@ -85,7 +97,11 @@
     <string name="message_action_followed_me"> 关注了我</string>
     <string name="message_follow_back">回关</string>
     <string name="message_liked_my_comment">赞了我的评论</string>
+    <string name="message_liked_my_video">赞了我的视频</string>
     <string name="message_collected_my_video">收藏了我的视频</string>
+    <string name="message_total_liked">总计%1$d人赞了我的评论</string>
+    <string name="message_total_liked_video">总计%1$d人赞了我的视频</string>
+    <string name="message_total_collected">总计%1$d人收藏了我的视频</string>
     <string name="message_clear_done">已标记为已读</string>
     <string name="message_follow_back_success">回关成功</string>
 </resources>
