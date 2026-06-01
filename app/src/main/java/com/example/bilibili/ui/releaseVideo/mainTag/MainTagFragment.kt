@@ -18,7 +18,7 @@ import com.example.bilibili.databinding.LayoutBottomSheetAddTagBinding
 import com.example.bilibili.ui.releaseVideo.ReleaseVideoViewModel
 import com.example.bilibili.ui.releaseVideo.bottomSheet.TagBottomSheetDialogFragment
 import com.google.android.material.bottomsheet.BottomSheetBehavior
-import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.example.bilibili.util.BilibiliBottomSheetDialog
 
 class MainTagFragment : Fragment() {
     private var _binding: FragmentMainTagBinding? = null
@@ -87,7 +87,7 @@ class MainTagFragment : Fragment() {
 
     private fun showAddTagInputDialog() {
         val addBinding = LayoutBottomSheetAddTagBinding.inflate(layoutInflater)
-        val dialog = BottomSheetDialog(requireContext(), R.style.TransparentBottomSheetStyle)
+        val dialog = BilibiliBottomSheetDialog(requireContext())
         dialog.setContentView(addBinding.root)
 
         val editText = addBinding.etTagInput

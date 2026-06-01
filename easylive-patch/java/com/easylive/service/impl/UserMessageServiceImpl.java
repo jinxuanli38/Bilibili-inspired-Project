@@ -264,6 +264,30 @@ public class UserMessageServiceImpl implements UserMessageService {
         }
         UserMessageExtendDto extendDto = new UserMessageExtendDto();
         extendDto.setMessageContent("关注了我");
+        String extendJson = JsonUtils.convertObj2Json(extendDto);
+
+        UserMessageQuery query = new UserMessageQuery();
+        query.setUserId(receiveUserId);
+        query.setSendUserId(sendUserId);
+        query.setMessageType(MessageTypeEnum.FANS.getType());
+        query.setOrderBy("message_id desc");
+        List<UserMessage> existingList = userMessageMapper.selectList(query);
+        if (existingList != null && !existingList.isEmpty()) {
+            UserMessage keep = existingList.get(0);
+            for (int i = 1; i < existingList.size(); i++) {
+                userMessageMapper.deleteByMessageId(existingList.get(i).getMessageId());
+            }
+            UserMessage patch = new UserMessage();
+            patch.setCreateTime(new Date());
+            patch.setReadType(MessageReadTypeEnum.NO_READ.getType());
+            patch.setExtendJson(extendJson);
+            userMessageMapper.updateByMessageId(patch, keep.getMessageId());
+            keep.setCreateTime(patch.getCreateTime());
+            keep.setReadType(patch.getReadType());
+            keep.setExtendJson(extendJson);
+            pushNewMessage(receiveUserId, keep);
+            return;
+        }
 
         UserMessage userMessage = new UserMessage();
         userMessage.setUserId(receiveUserId);
@@ -271,9 +295,24 @@ public class UserMessageServiceImpl implements UserMessageService {
         userMessage.setMessageType(MessageTypeEnum.FANS.getType());
         userMessage.setReadType(MessageReadTypeEnum.NO_READ.getType());
         userMessage.setCreateTime(new Date());
-        userMessage.setExtendJson(JsonUtils.convertObj2Json(extendDto));
+        userMessage.setExtendJson(extendJson);
         userMessageMapper.insert(userMessage);
         pushNewMessage(receiveUserId, userMessage);
+    }
+
+    @Override
+    public void removeFollowMessage(String receiveUserId, String sendUserId) {
+        if (StringTools.isEmpty(receiveUserId) || StringTools.isEmpty(sendUserId)) {
+            return;
+        }
+        UserMessageQuery query = new UserMessageQuery();
+        query.setUserId(receiveUserId);
+        query.setSendUserId(sendUserId);
+        query.setMessageType(MessageTypeEnum.FANS.getType());
+        userMessageMapper.deleteByQuery(query);
+        if (userMessagePushService != null) {
+            userMessagePushService.onUnreadChanged(receiveUserId);
+        }
     }
 
     private void pushNewMessage(String receiveUserId, UserMessage userMessage) {

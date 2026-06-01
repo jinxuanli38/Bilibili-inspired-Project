@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import com.example.bilibili.data.model.UserMessageItem
 import com.example.bilibili.ui.playVideo.PlayVideoActivity
-import com.example.bilibili.ui.playVideo.comment.CommentReplyActivity
 import com.example.bilibili.util.ToastUtils
 
 object MessageCommentNavigator {
@@ -21,20 +20,18 @@ object MessageCommentNavigator {
             ToastUtils.showShort(context, "无法打开评论区")
             return
         }
-        if (item.isDirectVideoComment || item.commentId <= 0) {
-            openVideoCommentTab(activity, item)
-        } else {
-            CommentReplyActivity.startFromMessage(activity, item)
-        }
+        openVideoCommentTab(activity, item)
     }
 
+    /** 统一进入播放页下方「评论」Tab，并定位到对应评论/回复 */
     private fun openVideoCommentTab(activity: Activity, item: UserMessageItem) {
         activity.startActivity(
             Intent(activity, PlayVideoActivity::class.java).apply {
-                putExtra("video_id", item.videoId)
+                putExtra(PlayVideoActivity.EXTRA_VIDEO_ID, item.videoId)
                 putExtra(PlayVideoActivity.EXTRA_OPEN_COMMENT_TAB, true)
                 putExtra(PlayVideoActivity.EXTRA_ANCHOR_SEND_USER_ID, item.sendUserId)
                 putExtra(PlayVideoActivity.EXTRA_ANCHOR_CONTENT, item.messageContent)
+                putExtra(PlayVideoActivity.EXTRA_ANCHOR_COMMENT_ID, item.commentId)
             },
         )
     }

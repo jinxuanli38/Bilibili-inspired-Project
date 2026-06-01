@@ -31,7 +31,7 @@ import com.example.bilibili.util.optNormalizedString
 import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.SPUtils
 import com.example.bilibili.util.ToastUtils
-import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.example.bilibili.util.BilibiliBottomSheetDialog
 import com.luck.picture.lib.basic.PictureSelector
 import com.luck.picture.lib.config.PictureConfig
 import com.luck.picture.lib.config.SelectMimeType
@@ -270,7 +270,7 @@ class EditActivity : AppCompatActivity() {
         editText.setText(currentText)
         editText.selectAll()
 
-        val dialog = BottomSheetDialog(this)
+        val dialog = BilibiliBottomSheetDialog(this)
         dialog.setContentView(dialogBinding.root)
         dialog.window?.setSoftInputMode(
             WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
@@ -308,7 +308,7 @@ class EditActivity : AppCompatActivity() {
             2 -> dialogBinding.rbSecret.isChecked = true
         }
 
-        val dialog = BottomSheetDialog(this)
+        val dialog = BilibiliBottomSheetDialog(this)
         dialog.setContentView(dialogBinding.root)
         dialog.show()
 

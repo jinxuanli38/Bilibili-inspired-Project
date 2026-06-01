@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import com.example.bilibili.MainActivity
 import com.example.bilibili.data.api.PostService
+import com.example.bilibili.ui.message.RealtimeSseClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -16,6 +17,7 @@ object AuthSessionHelper {
         SPUtils.saveUserId(data.getString("userId"))
         SPUtils.saveAvatar(data.optString("avatar"))
         SPUtils.saveNickname(data.getString("nickName"))
+        RealtimeSseClient.restart()
     }
 
     /** 登录/注册后拉取资料；若库里仍是空，则写入默认简介/学校 */

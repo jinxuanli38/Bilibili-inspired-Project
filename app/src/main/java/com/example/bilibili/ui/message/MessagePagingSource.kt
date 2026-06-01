@@ -38,8 +38,13 @@ class MessagePagingSource(
             for (i in 0 until listArray.length()) {
                 list.add(UserMessageItem.fromJson(listArray.getJSONObject(i)))
             }
+            val pageData = if (messageType == MessageTypes.FANS) {
+                FanMessageDedupe.dedupe(list)
+            } else {
+                list
+            }
             LoadResult.Page(
-                data = list,
+                data = pageData,
                 prevKey = if (page == 1) null else page - 1,
                 nextKey = PagingDefaults.nextPageKey(data, page, list.size),
             )

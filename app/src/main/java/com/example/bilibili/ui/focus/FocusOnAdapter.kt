@@ -37,7 +37,7 @@ class FocusOnAdapter(
 
         // 2. 根据 focusType 设置按钮文字和样式
         binding.btnFollowAction.apply {
-            FollowActionButtonUi.bind(this, user.focusType)
+            FollowActionButtonUi.bindForFollowingList(this, user.focusType)
             setOnClickListener { onActionClick(user) }
         }
     }

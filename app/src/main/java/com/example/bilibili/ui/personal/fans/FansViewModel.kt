@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.bilibili.data.api.PostService
 import com.example.bilibili.data.model.UserFriend
+import com.example.bilibili.util.FocusActionHelper
 import com.example.bilibili.util.RetrofitClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -51,17 +52,12 @@ class FansViewModel : ViewModel() {
     // 回关用户
     fun followBack(userId: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val response = service.focus(userId)
-                if (JSONObject(response).optString("status") == "success") {
-                    toastMessage.postValue("回关成功")
-                    loadData() // 刷新列表
-                } else {
-                    toastMessage.postValue("回关失败，请重试")
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                toastMessage.postValue("网络错误，请重试")
+            val ok = FocusActionHelper.setFocus(service, userId, follow = true)
+            if (ok) {
+                toastMessage.postValue("回关成功")
+                loadData()
+            } else {
+                toastMessage.postValue("回关失败，请重试")
             }
         }
     }

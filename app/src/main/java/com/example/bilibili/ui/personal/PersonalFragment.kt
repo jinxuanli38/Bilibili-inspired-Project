@@ -10,7 +10,9 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.FragmentActivity
@@ -24,14 +26,17 @@ import com.example.bilibili.ui.login.LoginActivity
 import com.example.bilibili.ui.personal.collect.CollectFragment
 import com.example.bilibili.ui.personal.contribute.ContributeFragment
 import com.example.bilibili.ui.personal.home.HomeFragment
+import com.example.bilibili.ui.user.FollowStatsCenter
 import com.example.bilibili.util.AvatarUpdateHelper
 import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.ToastUtils
 import com.example.bilibili.util.UserInfoText
 import com.example.bilibili.util.optNormalizedString
+import com.example.bilibili.util.FollowRelationRefreshTracker
 import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.SPUtils
 import com.google.android.material.tabs.TabLayoutMediator
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -43,6 +48,9 @@ class PersonalFragment : Fragment() {
 
     private val tabTitles = listOf("主页", "投稿", "收藏")
     private var currentUserId: String = ""
+    private var cachedFansCount = 0
+    private var cachedFocusCount = 0
+    private val followRefreshTracker = FollowRelationRefreshTracker()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -60,57 +68,13 @@ class PersonalFragment : Fragment() {
         setupStatusBarPadding()
 
         setupViewPagerAndTabs()
+        observeFollowStats()
 
         // 先用本地缓存头像，避免等接口期间一直显示默认图
         GlideEngine.loadUserAvatar(requireContext(), SPUtils.getAvatar(), binding.ivAvatar)
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val responseString = withContext(Dispatchers.IO) {
-                    // 获取个人信息
-                    val postService = RetrofitClient.create(PostService::class.java)
-                    postService.getUserInfo(SPUtils.getUserId())
-                }
-                val userInfo = JSONObject(responseString)
-                if (userInfo.optInt("code") == 200) {
-                    val data = userInfo.getJSONObject("data")
-                    // 更新个人信息
-                    binding.apply {
-                        // 获取并更新头像
-                        val avatar = data.optString("avatar", "")
-                        SPUtils.saveAvatar(avatar) // 更新本地存储的头像
-                        GlideEngine.loadUserAvatar(requireContext(), avatar, ivAvatar)
-                        // 粉丝数量
-                        tvFansCount.text = data.optInt("fansCount").toString()
-                        // 关注数量
-                        tvFollowCount.text = data.optInt("focusCount").toString()
-                        // 获赞数量
-                        tvLikeCount.text = data.optInt("likeCount").toString()
-                        // 昵称
-                        tvNickname.text = data.optNormalizedString("nickName")
-                            .ifEmpty { "用户" }
-                        tvDescription.text = UserInfoText.displayIntroduction(
-                            data.optNormalizedString("personalIntroduction")
-                        )
-                        val school = data.optNormalizedString("school")
-                        tvSchool.text = UserInfoText.displaySchool(school)
-                        currentUserId = data.optString("userId", SPUtils.getUserId())
-                        tvUid.text = currentUserId
-                        SPUtils.savePersonalIntroduction(
-                            UserInfoText.storageIntroduction(
-                                data.optNormalizedString("personalIntroduction")
-                            )
-                        )
-                        SPUtils.saveSchool(UserInfoText.storageSchool(school))
-                        SPUtils.saveBirthday(data.optNormalizedString("birthday"))
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                binding.loadingView.visibility = View.GONE
-            }
-        }
+        followRefreshTracker.sync()
+        refreshProfileFromServer(showLoading = true)
 
         binding.btnLogout.setOnClickListener {
             startActivity(Intent(requireContext(), EditActivity::class.java))
@@ -205,6 +169,96 @@ class PersonalFragment : Fragment() {
         }
     }
 
+    private fun refreshProfileFromServer(showLoading: Boolean = false) {
+        if (_binding == null) return
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (showLoading) {
+                binding.loadingView.visibility = View.VISIBLE
+            }
+            try {
+                val userId = SPUtils.getUserId()
+                if (userId.isEmpty()) return@launch
+                val responseString = withContext(Dispatchers.IO) {
+                    RetrofitClient.create(PostService::class.java).getUserInfo(userId)
+                }
+                val userInfo = JSONObject(responseString)
+                if (userInfo.optInt("code") == 200) {
+                    applyProfileData(userInfo.getJSONObject("data"))
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                if (_binding != null) {
+                    binding.loadingView.visibility = View.GONE
+                }
+            }
+        }
+    }
+
+    private fun applyProfileData(data: JSONObject) {
+        if (_binding == null) return
+        binding.apply {
+            val avatar = data.optString("avatar", "")
+            SPUtils.saveAvatar(avatar)
+            GlideEngine.loadUserAvatar(requireContext(), avatar, ivAvatar)
+            cachedFansCount = data.optInt("fansCount")
+            cachedFocusCount = data.optInt("focusCount")
+            FollowStatsCenter.seedSelfCounts(cachedFansCount, cachedFocusCount)
+            tvFansCount.text = cachedFansCount.toString()
+            tvFollowCount.text = cachedFocusCount.toString()
+            tvLikeCount.text = data.optInt("likeCount").toString()
+            tvNickname.text = data.optNormalizedString("nickName").ifEmpty { "用户" }
+            tvDescription.text = UserInfoText.displayIntroduction(
+                data.optNormalizedString("personalIntroduction"),
+            )
+            val school = data.optNormalizedString("school")
+            tvSchool.text = UserInfoText.displaySchool(school)
+            currentUserId = data.optString("userId", SPUtils.getUserId())
+            tvUid.text = currentUserId
+            SPUtils.savePersonalIntroduction(
+                UserInfoText.storageIntroduction(data.optNormalizedString("personalIntroduction")),
+            )
+            SPUtils.saveSchool(UserInfoText.storageSchool(school))
+            SPUtils.saveBirthday(data.optNormalizedString("birthday"))
+        }
+        followRefreshTracker.sync()
+    }
+
+    private fun observeFollowStats() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    FollowStatsCenter.changes.collectLatest { change ->
+                        FollowStatsCenter.focusDeltaForSelf(change)?.let { delta ->
+                            cachedFocusCount = FollowStatsCenter.adjustFocusCount(cachedFocusCount, delta)
+                            binding.tvFollowCount.text = cachedFocusCount.toString()
+                        }
+                        FollowStatsCenter.fansDeltaForSelf(change)?.let { delta ->
+                            cachedFansCount = FollowStatsCenter.adjustFansCount(cachedFansCount, delta)
+                            binding.tvFansCount.text = cachedFansCount.toString()
+                        }
+                    }
+                }
+                launch {
+                    FollowStatsCenter.fansCountUpdates.collectLatest { update ->
+                        if (update.userId == SPUtils.getUserId()) {
+                            cachedFansCount = update.count
+                            binding.tvFansCount.text = update.count.toString()
+                        }
+                    }
+                }
+                launch {
+                    FollowStatsCenter.focusCountUpdates.collectLatest { update ->
+                        if (update.userId == SPUtils.getUserId()) {
+                            cachedFocusCount = update.count
+                            binding.tvFollowCount.text = update.count.toString()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private fun setupLogoutButton() {
         val isLoggedIn = SPUtils.getToken().isNotEmpty() && SPUtils.getUserId().isNotEmpty()
         if (isLoggedIn) {
@@ -222,6 +276,7 @@ class PersonalFragment : Fragment() {
             .setPositiveButton("确定") { _, _ ->
                 // 退出登录逻辑
                 SPUtils.cleanToken()
+                com.example.bilibili.ui.message.RealtimeSseClient.forceStop()
                 val intent = Intent(requireContext(), LoginActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 startActivity(intent)
@@ -246,16 +301,22 @@ class PersonalFragment : Fragment() {
         }.attach()
     }
 
+    override fun onPause() {
+        followRefreshTracker.onPause()
+        super.onPause()
+    }
+
     override fun onResume() {
         super.onResume()
-        // 从编辑资料页返回后刷新头像（不必重启 App）
-        if (_binding != null) {
-            GlideEngine.loadUserAvatar(requireContext(), SPUtils.getAvatar(), binding.ivAvatar)
-            binding.tvSchool.text = UserInfoText.displaySchool(SPUtils.getSchool())
-            val uid = currentUserId.ifEmpty { SPUtils.getUserId() }
-            if (uid.isNotEmpty()) {
-                binding.tvUid.text = uid
-            }
+        if (_binding == null) return
+        GlideEngine.loadUserAvatar(requireContext(), SPUtils.getAvatar(), binding.ivAvatar)
+        binding.tvSchool.text = UserInfoText.displaySchool(SPUtils.getSchool())
+        val uid = currentUserId.ifEmpty { SPUtils.getUserId() }
+        if (uid.isNotEmpty()) {
+            binding.tvUid.text = uid
+        }
+        followRefreshTracker.onResumeIfChanged {
+            refreshProfileFromServer(showLoading = false)
         }
     }
 

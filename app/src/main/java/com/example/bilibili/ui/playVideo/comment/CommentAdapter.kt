@@ -229,16 +229,33 @@ class CommentAdapter : RecyclerView.Adapter<CommentAdapter.CommentViewHolder>() 
             }
 
             val anchorToParent = item.commentId == highlightedCommentId
-            val anchorToChild = highlightedCommentId != null &&
-                item.children.orEmpty().any { it.commentId == highlightedCommentId }
+            val targetId = highlightedCommentId
+            val anchorToChild = targetId != null &&
+                CommentTreeHelper.containsDescendant(item, targetId)
             val forceCollapsedForAnchor = anchorToParent
 
-            // 仅 1 条回复：默认展开；定位主评论时收起；定位子评论时需展开以显示高亮
-            if (children.size == 1 && !forceCollapsedForAnchor && !anchorToChild) {
-                binding.llReplyPreview.visibility = View.GONE
-                binding.llExpandedReplies.visibility = View.VISIBLE
-                binding.tvCollapseReplies.visibility = View.GONE
-                bindChildReplies(children)
+            // 仅 1 条回复：不显示「收起回复」；消息定位子回复时仍展开以便高亮
+            if (children.size == 1) {
+                val showExpanded = anchorToChild || !forceCollapsedForAnchor
+                if (showExpanded) {
+                    binding.llReplyPreview.visibility = View.GONE
+                    binding.llExpandedReplies.visibility = View.VISIBLE
+                    binding.tvCollapseReplies.visibility = View.GONE
+                    bindChildReplies(children)
+                } else {
+                    binding.llReplyPreview.visibility = View.VISIBLE
+                    binding.llExpandedReplies.visibility = View.GONE
+                    val firstReply = children[0]
+                    binding.tvFirstReply.text = "${firstReply.nickName}: ${firstReply.content}"
+                    binding.llReplyPreview.setOnClickListener {
+                        toggleExpand(item.commentId)
+                    }
+                    binding.tvReplyCountLink.visibility = View.VISIBLE
+                    binding.tvReplyCountLink.text = "共1条回复 >"
+                    binding.tvReplyCountLink.setOnClickListener {
+                        toggleExpand(item.commentId)
+                    }
+                }
                 return
             }
 

@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -23,7 +24,7 @@ import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.ToastUtils
 import com.google.android.material.bottomsheet.BottomSheetBehavior
-import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.example.bilibili.util.BilibiliBottomSheetDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -45,7 +46,7 @@ class VideoCommentFragment : Fragment() {
     private var replyCommentId: Int? = null
 
     // 底部对话框
-    private var commentBottomSheetDialog: BottomSheetDialog? = null
+    private var commentBottomSheetDialog: BilibiliBottomSheetDialog? = null
 
     private val fileService = RetrofitClient.create(FileService::class.java)
 
@@ -62,6 +63,7 @@ class VideoCommentFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         initRecyclerView()
+        setupSwipeRefresh()
         observeViewModel()
         setupBottomBar()
         setupEmptyState()
@@ -220,6 +222,21 @@ class VideoCommentFragment : Fragment() {
         }
     }
 
+    private fun setupSwipeRefresh() {
+        binding.swipeRefresh.setColorSchemeColors(
+            ContextCompat.getColor(requireContext(), R.color.bilibili_pink),
+        )
+        binding.swipeRefresh.setOnRefreshListener {
+            val videoId = currentVideoId
+            if (videoId.isNullOrEmpty()) {
+                binding.swipeRefresh.isRefreshing = false
+                ToastUtils.showShort(requireContext(), "视频信息加载中，请稍后")
+                return@setOnRefreshListener
+            }
+            viewModel.fetchComments(videoId)
+        }
+    }
+
     private fun notifyCommentItemChanged(commentItem: CommentItem) {
         val list = commentAdapter.differ.currentList
         val topIndex = list.indexOfFirst { it.commentId == commentItem.commentId }
@@ -261,7 +278,7 @@ class VideoCommentFragment : Fragment() {
         // 如果对话框已显示，先关闭
         commentBottomSheetDialog?.dismiss()
 
-        commentBottomSheetDialog = BottomSheetDialog(requireContext(), R.style.TransparentBottomSheetStyle).apply {
+        commentBottomSheetDialog = BilibiliBottomSheetDialog(requireContext()).apply {
             // 设置窗口软输入模式，让软键盘推动内容
             window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
@@ -362,12 +379,17 @@ class VideoCommentFragment : Fragment() {
     }
 
     private fun observeViewModel() {
+        viewModel.errorLive.observe(viewLifecycleOwner) {
+            binding.swipeRefresh.isRefreshing = false
+        }
+
         viewModel.commentTotalCount.observe(viewLifecycleOwner) { count ->
             updateEmptyState(count)
         }
 
         // 观察评论列表数据变化
         viewModel.commentListLive.observe(viewLifecycleOwner) { list ->
+            binding.swipeRefresh.isRefreshing = false
             commentAdapter.setData(list) {
                 applyCommentAnchorIfNeeded(list)
             }

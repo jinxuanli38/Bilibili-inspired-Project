@@ -36,7 +36,6 @@ class MessageFragment : Fragment() {
         markMessageRead(item.messageId)
     }
     private val messageService = RetrofitClient.create(MessageService::class.java)
-    private val sseClient = MessageSseClient()
 
     private lateinit var quickReplyBinding: ItemMessageQuickActionBinding
     private lateinit var quickLikeBinding: ItemMessageQuickActionBinding
@@ -63,15 +62,11 @@ class MessageFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        sseClient.start { payload ->
-            activity?.runOnUiThread {
-                MessageUnreadCenter.applySsePayload(payload)
-            }
-        }
+        RealtimeSseClient.acquire()
     }
 
     override fun onStop() {
-        sseClient.stop()
+        RealtimeSseClient.release()
         super.onStop()
     }
 

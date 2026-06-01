@@ -20,16 +20,23 @@ import com.example.bilibili.R
 import com.example.bilibili.data.api.PostService
 import com.example.bilibili.databinding.ActivityUserProfileBinding
 import com.example.bilibili.ui.edit.EditActivity
+import com.example.bilibili.ui.message.RealtimeSseClient
+import com.example.bilibili.ui.user.FollowStatsCenter
 import com.example.bilibili.ui.personal.contribute.ContributeFragment
 import com.example.bilibili.ui.personal.home.HomeFragment
 import com.example.bilibili.ui.login.LoginActivity
 import com.example.bilibili.util.FollowActionButtonUi
+import com.example.bilibili.util.FollowConfirmDialog
+import com.example.bilibili.util.FollowRelationRefreshTracker
 import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.SPUtils
 import com.example.bilibili.util.ToastUtils
 import com.example.bilibili.util.UserInfoText
 import com.google.android.material.tabs.TabLayoutMediator
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -47,6 +54,7 @@ class UserProfileActivity : AppCompatActivity() {
 
     // 目标用户ID
     private var targetUserId: String? = null
+    private val followRefreshTracker = FollowRelationRefreshTracker()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,6 +89,20 @@ class UserProfileActivity : AppCompatActivity() {
 
         // 返回按钮
         binding.ivBack.setOnClickListener { finish() }
+
+        followRefreshTracker.sync()
+    }
+
+    override fun onPause() {
+        followRefreshTracker.onPause()
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        followRefreshTracker.onResumeIfChanged {
+            targetUserId?.let { viewModel.refreshUserInfo(it) }
+        }
     }
 
     private fun isCurrentUser(): Boolean {
@@ -100,8 +122,17 @@ class UserProfileActivity : AppCompatActivity() {
         } else {
             binding.btnFocus.visibility = View.VISIBLE
             binding.btnFocus.setOnClickListener {
-                viewModel.toggleFocus(targetUserId!!)
+                showFollowToggleConfirmDialog()
             }
+        }
+    }
+
+    private fun showFollowToggleConfirmDialog() {
+        val userId = targetUserId ?: return
+        val nick = viewModel.userInfo.value?.nickName.orEmpty()
+        val isFocused = viewModel.focusState.value == true
+        FollowConfirmDialog.show(this, nick, isFocused) {
+            viewModel.toggleFocus(userId)
         }
     }
 
@@ -129,6 +160,7 @@ class UserProfileActivity : AppCompatActivity() {
             .setPositiveButton("确定") { _, _ ->
                 // 退出登录逻辑
                 SPUtils.cleanToken()
+                RealtimeSseClient.forceStop()
                 val intent = Intent(this, LoginActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 startActivity(intent)
@@ -195,20 +227,41 @@ class UserProfileActivity : AppCompatActivity() {
 
     private fun observeData() {
         viewModel.userInfo.observe(this) { userInfo ->
-            // 更新UI
             userInfo?.let { updateUI(it) }
         }
 
-        viewModel.focusState.observe(this) { isFocused ->
-            if (!isCurrentUser()) {
-                updateFocusButton(isFocused, viewModel.focusType.value ?: 0)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    FollowStatsCenter.changes.collectLatest { change ->
+                        val displayedId = targetUserId.orEmpty()
+                        if (displayedId.isEmpty()) return@collectLatest
+                        viewModel.applyFollowChange(change)
+                    }
+                }
+                launch {
+                    FollowStatsCenter.fansCountUpdates.collectLatest { update ->
+                        if (update.userId == targetUserId) {
+                            viewModel.applyFansCount(update.count)
+                        }
+                    }
+                }
+                launch {
+                    FollowStatsCenter.focusCountUpdates.collectLatest { update ->
+                        if (isCurrentUser() && update.userId == targetUserId) {
+                            viewModel.applyFocusCount(update.count)
+                        }
+                    }
+                }
             }
         }
 
-        viewModel.focusType.observe(this) { type ->
-            if (!isCurrentUser() && (viewModel.focusState.value == true)) {
-                updateFocusButton(true, type)
-            }
+        viewModel.focusState.observe(this) {
+            refreshFocusButtonFromViewModel()
+        }
+
+        viewModel.focusType.observe(this) {
+            refreshFocusButtonFromViewModel()
         }
 
         binding.rowUid.setOnClickListener {
@@ -250,20 +303,19 @@ class UserProfileActivity : AppCompatActivity() {
         binding.tvFollowCount.text = userInfo.focusCount.toString()
         binding.tvLikeCount.text = userInfo.likeCount.toString()
 
-        // 他人主页才更新关注状态
         if (!isCurrentUser()) {
-            viewModel.setFocused(userInfo.haveFocus, userInfo.focusType)
-            updateFocusButton(userInfo.haveFocus, userInfo.focusType)
+            refreshFocusButtonFromViewModel()
         }
 
-        // 显示内容，隐藏加载遮罩
         binding.loadingView.visibility = View.GONE
     }
 
-    private fun updateFocusButton(isFocused: Boolean, focusType: Int) {
+    private fun refreshFocusButtonFromViewModel() {
         if (isCurrentUser()) return
-        if (isFocused) {
-            FollowActionButtonUi.bind(binding.btnFocus, focusType)
+        val focused = viewModel.focusState.value ?: false
+        val type = viewModel.focusType.value ?: 0
+        if (focused) {
+            FollowActionButtonUi.bind(binding.btnFocus, type)
         } else {
             FollowActionButtonUi.bind(binding.btnFocus, 0)
         }

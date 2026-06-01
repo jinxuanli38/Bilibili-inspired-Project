@@ -19,30 +19,59 @@ object CategoryPartitionHelper {
 
     /** 从稿件 JSON 读取一级/二级分区 ID（兼容多种字段名）。 */
     fun readVideoCategoryIds(videoInfo: JSONObject): Pair<Int, Int> {
-        val pCategoryId = optCategoryInt(
+        var pCategoryId = optCategoryInt(
             videoInfo,
+            "pcategoryId", // getVideoInfoByVideoId 实际返回字段（Jackson 序列化 VideoInfoPost）
             "pCategoryId",
             "PCategoryId",
             "p_category_id",
         )
-        val categoryId = optCategoryInt(
+        if (pCategoryId == 0) {
+            pCategoryId = optCategoryIntByKeyPattern(videoInfo, "pcategory")
+        }
+        var categoryId = optCategoryInt(
             videoInfo,
             "categoryId",
             "CategoryId",
             "category_id",
         )
+        if (categoryId == 0) {
+            categoryId = optCategoryIntByKeyPattern(videoInfo, "categoryid") { key ->
+                !key.contains("pcategory", ignoreCase = true)
+            }
+        }
         return pCategoryId to categoryId
     }
 
     private fun optCategoryInt(json: JSONObject, vararg keys: String): Int {
         for (key in keys) {
             if (!json.has(key) || json.isNull(key)) continue
-            when (val value = json.get(key)) {
-                is Number -> return value.toInt()
-                is String -> value.toIntOrNull()?.let { return it }
-            }
+            parseCategoryValue(json.get(key))?.let { return it }
         }
         return 0
+    }
+
+    /** 按键名模糊匹配（忽略大小写、下划线），兼容 pcategoryId 等序列化差异。 */
+    private fun optCategoryIntByKeyPattern(
+        json: JSONObject,
+        keyContains: String,
+        keyFilter: (String) -> Boolean = { true },
+    ): Int {
+        val keys = json.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            if (!key.replace("_", "").contains(keyContains, ignoreCase = true)) continue
+            if (!keyFilter(key)) continue
+            if (json.isNull(key)) continue
+            parseCategoryValue(json.get(key))?.let { return it }
+        }
+        return 0
+    }
+
+    private fun parseCategoryValue(value: Any?): Int? = when (value) {
+        is Number -> value.toInt()
+        is String -> value.toIntOrNull()
+        else -> null
     }
 
     fun parseCategoryTreeData(categoryTreeResponse: String): JSONArray? {

@@ -22,7 +22,7 @@ import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.SPUtils
 import com.example.bilibili.util.ToastUtils
 import com.example.bilibili.util.UserInfoText
-import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.example.bilibili.util.BilibiliBottomSheetDialog
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -189,7 +189,12 @@ class CommentReplyActivity : AppCompatActivity() {
                 allRootComments.addAll(pageResult.comments)
                 hasMore = pageResult.hasMore
 
-                val replies = CommentTreeHelper.directReplies(allRootComments, commentId)
+                val replies = CommentTreeHelper.repliesForMessageThread(
+                    allRoots = allRootComments,
+                    parentCommentId = commentId,
+                    anchorSendUserId = anchorSendUserId,
+                    anchorContent = anchorContent,
+                )
                 if (replies.isNotEmpty()) {
                     bindReplies(replies)
                 } else if (hasMore) {
@@ -242,10 +247,14 @@ class CommentReplyActivity : AppCompatActivity() {
         val content = anchorContent.orEmpty()
         if (userId.isBlank() && content.isBlank()) return
         val anchor = CommentAnchor(sendUserId = userId, content = content, parentCommentId = commentId)
-        val result = CommentLocator.findInFlatList(comments, anchor) ?: run {
-            ToastUtils.showShort(this, getString(R.string.message_comment_not_found))
-            return
-        }
+        val result = CommentLocator.findInFlatList(comments, anchor)
+            ?: CommentTreeHelper.findByAnchor(allRootComments, userId, content)?.let { found ->
+                CommentLocator.LocateResult(highlightCommentId = found.commentId)
+            }
+            ?: run {
+                ToastUtils.showShort(this, getString(R.string.message_comment_not_found))
+                return
+            }
         anchorHighlightApplied = true
         adapter?.setHighlightedCommentId(result.highlightCommentId)
         binding.rvReplies.post {
@@ -264,7 +273,7 @@ class CommentReplyActivity : AppCompatActivity() {
             return
         }
 
-        val bottomSheetDialog = BottomSheetDialog(this, R.style.TransparentBottomSheetStyle)
+        val bottomSheetDialog = BilibiliBottomSheetDialog(this)
         val dialogBinding = com.example.bilibili.databinding.DialogCommentInputBinding.inflate(layoutInflater)
         bottomSheetDialog.setContentView(dialogBinding.root)
 

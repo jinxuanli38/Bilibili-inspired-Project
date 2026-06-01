@@ -11,15 +11,22 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.LoadState
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.bilibili.R
 import com.example.bilibili.data.model.UserFriend
 import com.example.bilibili.databinding.FragmentFriendListTabBinding
+import com.example.bilibili.ui.friends.MyFriendsViewModel
 import com.example.bilibili.ui.user.UserProfileActivity
+import com.example.bilibili.util.FollowConfirmDialog
+import com.example.bilibili.util.FollowRelationRefreshTracker
 import com.example.bilibili.util.PagingUiHelper
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /** 我的好友 - 关注 Tab */
@@ -29,7 +36,9 @@ class FollowingListFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val viewModel: FocusOnViewModel by viewModels()
+    private val friendsViewModel: MyFriendsViewModel by activityViewModels()
     private lateinit var adapter: FocusOnPagingAdapter
+    private val followRefreshTracker = FollowRelationRefreshTracker()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -73,6 +82,33 @@ class FollowingListFragment : Fragment() {
                 updateFollowingSummary(adapter.itemCount)
             }
         }
+
+        observeSharedListRefresh()
+        followRefreshTracker.sync()
+    }
+
+    override fun onPause() {
+        followRefreshTracker.onPause()
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        followRefreshTracker.onResumeIfChanged {
+            if (_binding != null && ::adapter.isInitialized) {
+                adapter.refresh()
+            }
+        }
+    }
+
+    private fun observeSharedListRefresh() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                friendsViewModel.refreshLists.collectLatest {
+                    adapter.refresh()
+                }
+            }
+        }
     }
 
     private fun updateFollowingSummary(count: Int) {
@@ -98,15 +134,13 @@ class FollowingListFragment : Fragment() {
     }
 
     private fun showCancelFollowDialog(user: UserFriend) {
-        AlertDialog.Builder(requireContext(), R.style.PinkDialogTheme)
-            .setTitle("取消关注")
-            .setMessage("确定要取消关注 ${user.otherNickName} 吗？")
-            .setPositiveButton("确定") { _, _ ->
-                viewModel.cancelFollow(user.otherUserId)
-                adapter.refresh()
+        FollowConfirmDialog.show(requireContext(), user.otherNickName, currentlyFocused = true) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                if (viewModel.cancelFollow(user.otherUserId)) {
+                    friendsViewModel.notifyFollowRelationChanged()
+                }
             }
-            .setNegativeButton("取消", null)
-            .show()
+        }
     }
 
     override fun onDestroyView() {

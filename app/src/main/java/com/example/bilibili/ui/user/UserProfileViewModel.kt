@@ -5,7 +5,9 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.bilibili.data.api.PostService
+import com.example.bilibili.util.FocusActionHelper
 import com.example.bilibili.util.RetrofitClient
+import com.example.bilibili.util.SPUtils
 import com.example.bilibili.util.UserInfoText
 import com.example.bilibili.util.optNormalizedString
 import kotlinx.coroutines.Dispatchers
@@ -82,34 +84,72 @@ class UserProfileViewModel : ViewModel() {
         _focusType.value = type
     }
 
+    fun applyFansCount(count: Int) {
+        val info = _userInfo.value ?: return
+        _userInfo.value = info.copy(fansCount = count.coerceAtLeast(0))
+    }
+
+    fun applyFocusCount(count: Int) {
+        val info = _userInfo.value ?: return
+        _userInfo.value = info.copy(focusCount = count.coerceAtLeast(0))
+    }
+
+    fun applyFollowChange(change: FollowStatsCenter.FollowChange) {
+        var info = _userInfo.value ?: return
+        if (info.userId == change.targetUserId) {
+            val delta = if (change.followed) 1 else -1
+            info = info.copy(fansCount = FollowStatsCenter.adjustFansCount(info.fansCount, delta))
+        }
+        val selfId = SPUtils.getUserId()
+        if (info.userId == selfId) {
+            FollowStatsCenter.focusDeltaForSelf(change)?.let { delta ->
+                info = info.copy(focusCount = FollowStatsCenter.adjustFocusCount(info.focusCount, delta))
+            }
+        }
+        _userInfo.value = info
+    }
+
     fun toggleFocus(targetUserId: String) {
         viewModelScope.launch {
+            val currentState = _focusState.value ?: false
+            val currentType = _focusType.value ?: 0
+            val newState = !currentState
+            val newType = if (newState) 2 else 0
+            val previousInfo = _userInfo.value
+
+            _focusState.value = newState
+            _focusType.value = newType
+            syncUserInfoFocusState(newState, newType)
+
+            val ok = FocusActionHelper.setFocus(postService, targetUserId, newState)
+            if (!ok) {
+                _focusState.value = currentState
+                _focusType.value = currentType
+                if (previousInfo != null) {
+                    _userInfo.value = previousInfo
+                }
+            } else {
+                refreshUserInfo(targetUserId)
+            }
+        }
+    }
+
+    private fun syncUserInfoFocusState(focused: Boolean, focusType: Int) {
+        val info = _userInfo.value ?: return
+        _userInfo.value = info.copy(haveFocus = focused, focusType = focusType)
+    }
+
+    fun refreshUserInfo(targetUserId: String) {
+        viewModelScope.launch {
             try {
-                val currentState = _focusState.value ?: false
-                val currentType = _focusType.value ?: 0
-                val newState = !currentState
-                val newType = if (newState) 2 else 0
-
-                _focusState.value = newState
-                _focusType.value = newType
-
                 val result = withContext(Dispatchers.IO) {
-                    if (newState) {
-                        postService.focus(targetUserId)
-                    } else {
-                        postService.cancelFocus(targetUserId)
-                    }
+                    postService.getUserInfo(targetUserId)
                 }
-
                 val jsonObject = JSONObject(result)
-                if (jsonObject.optInt("code") != 200) {
-                    _focusState.value = currentState
-                    _focusType.value = currentType
+                if (jsonObject.optInt("code") == 200) {
+                    setUserInfo(jsonObject.getJSONObject("data"))
                 }
-            } catch (e: Exception) {
-                val wasFocused = _focusState.value ?: false
-                _focusState.value = !wasFocused
-                _focusType.value = if (!wasFocused) 2 else 0
+            } catch (_: Exception) {
             }
         }
     }

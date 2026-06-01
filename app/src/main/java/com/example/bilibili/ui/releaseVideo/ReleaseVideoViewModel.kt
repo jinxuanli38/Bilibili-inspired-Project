@@ -64,6 +64,10 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
     /** 稿件状态：0 转码中 2 待审核 3 通过 4 未通过 */
     private var editingVideoStatus: Int? = null
 
+    /** 编辑稿件原始分区 ID（分类树解析失败时仍可用于保存） */
+    private var editPCategoryId: Int = 0
+    private var editCategoryId: Int = 0
+
     val editLoadedLive = MutableLiveData(false)
 
     enum class StatementType {
@@ -86,7 +90,58 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun hasPartitionSelected(): Boolean {
-        return (selectedPartition.value?.categoryId ?: 0) > 0
+        val selected = selectedPartition.value
+        if ((selected?.categoryId ?: 0) > 0) return true
+        return editPCategoryId > 0 || editCategoryId > 0
+    }
+
+    private fun effectiveCategoryIds(): Pair<Int, Int> {
+        val selected = selectedPartition.value
+        if ((selected?.categoryId ?: 0) > 0) {
+            val sub = selected?.subCategoryId ?: 0
+            return selected!!.categoryId to sub
+        }
+        if (editPCategoryId > 0) {
+            return editPCategoryId to editCategoryId
+        }
+        if (editCategoryId > 0) {
+            return editCategoryId to 0
+        }
+        return 0 to 0
+    }
+
+    private fun buildFallbackPartition(pCategoryId: Int, categoryId: Int): CategoryInfo {
+        val parentId = when {
+            pCategoryId > 0 -> pCategoryId
+            categoryId > 0 -> categoryId
+            else -> 0
+        }
+        val subId = if (pCategoryId > 0 && categoryId > 0 && categoryId != pCategoryId) categoryId else null
+        val label = getApplication<Application>().getString(R.string.release_partition_selected_fallback)
+        return CategoryInfo(
+            categoryId = parentId,
+            categoryName = label,
+            subCategoryId = subId,
+            subCategoryName = if (subId != null) label else null,
+        )
+    }
+
+    private suspend fun applyPartitionForEdit(pCategoryId: Int, categoryId: Int) {
+        editPCategoryId = pCategoryId
+        editCategoryId = categoryId
+        if (pCategoryId <= 0 && categoryId <= 0) return
+
+        CategoryTreeLoader.clearCache()
+        val resolved = resolvePartitionForEdit(pCategoryId, categoryId)
+        if (resolved != null && CategoryPartitionHelper.displayName(resolved).isNotBlank()) {
+            selectedPartition.postValue(resolved)
+            return
+        }
+        selectedPartition.postValue(buildFallbackPartition(pCategoryId, categoryId))
+        val retry = resolvePartitionForEdit(pCategoryId, categoryId)
+        if (retry != null && CategoryPartitionHelper.displayName(retry).isNotBlank()) {
+            selectedPartition.postValue(retry)
+        }
     }
 
     fun addTag(name: String) {
@@ -184,15 +239,7 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
                 repostSource.postValue(videoInfo.optString("originInfo"))
 
                 val (pCategoryId, categoryId) = readCategoryIdsForEdit(videoId, videoInfo)
-                val partition = resolvePartitionForEdit(pCategoryId, categoryId)
-                if (partition != null) {
-                    selectedPartition.postValue(partition)
-                } else if (pCategoryId > 0 || categoryId > 0) {
-                    Log.w(
-                        "ReleaseVideo",
-                        "partition ids present but names missing: p=$pCategoryId c=$categoryId",
-                    )
-                }
+                applyPartitionForEdit(pCategoryId, categoryId)
 
                 val parts = mutableListOf<ReleaseVideoPart>()
                 synchronized(partsLock) { uploadFinishedPartIds.clear() }
@@ -418,6 +465,11 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
             postStatus.postValue("请选择分区")
             return
         }
+        val (pCategoryId, categoryId) = effectiveCategoryIds()
+        if (pCategoryId <= 0) {
+            postStatus.postValue("请选择分区")
+            return
+        }
         if (videoTitle.value.isNullOrEmpty()) {
             postStatus.postValue("请输入视频标题")
             return
@@ -430,7 +482,6 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
         isPosting = true
         canPublish.postValue(false)
 
-        val partition = selectedPartition.value!!
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val postService = RetrofitClient.create(PostService::class.java)
@@ -441,12 +492,13 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
                     }
                     jsonArray.put(buildUploadFileJson(part))
                 }
+                val subCategoryId = categoryId.takeIf { it > 0 && it != pCategoryId }
                 val response = postService.postVideo(
                     videoId = editingVideoId,
                     videoCover = videoCoverUrl.value ?: "",
                     videoName = videoTitle.value ?: "",
-                    pCategoryId = partition.categoryId,
-                    categoryId = partition.subCategoryId,
+                    pCategoryId = pCategoryId,
+                    categoryId = subCategoryId,
                     postType = if (statementType.value == StatementType.ORIGINAL) 0 else 1,
                     tags = tags.joinToString(","),
                     introduction = introduction.value ?: "",

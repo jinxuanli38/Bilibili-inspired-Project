@@ -42,7 +42,7 @@ class FocusOnPagingAdapter(
         binding.ivMore.visibility = View.GONE
 
         binding.btnFollowAction.apply {
-            FollowActionButtonUi.bind(this, user.focusType)
+            FollowActionButtonUi.bindForFollowingList(this, user.focusType)
             setOnClickListener { onActionClick(user) }
         }
     }

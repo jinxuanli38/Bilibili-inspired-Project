@@ -13,12 +13,18 @@ import android.widget.RelativeLayout
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.bilibili.R
 import com.example.bilibili.data.model.PlayVideoPartItem
 import com.example.bilibili.databinding.FragmentVideoIntroBinding
 import com.example.bilibili.ui.playVideo.PlayVideoViewModel
+import com.example.bilibili.ui.user.FollowStatsCenter
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import com.example.bilibili.ui.user.UserProfileActivity
 import com.example.bilibili.util.DeviceIdHelper
 import com.example.bilibili.util.FollowActionButtonUi
@@ -63,6 +69,7 @@ class VideoIntroFragment : Fragment() {
         initRecommendList()
         initVideoPartList()
         initExpandLogic()
+        observeFollowStats()
 
         // 1. 监听视频主数据 (标题、点赞数、时间等)
         sharedViewModel.videoDetailLive.observe(viewLifecycleOwner) { videoInfo ->
@@ -301,6 +308,29 @@ class VideoIntroFragment : Fragment() {
                 setCompoundDrawablesRelative(null, null, null, null)
                 setTextColor(Color.WHITE)
                 setBackgroundResource(R.drawable.bg_follow_button)
+            }
+        }
+    }
+
+    private fun observeFollowStats() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    FollowStatsCenter.changes.collectLatest { change ->
+                        val authorId = sharedViewModel.authorLive.value?.optString("userId").orEmpty()
+                        if (authorId.isNotEmpty() && authorId == change.targetUserId) {
+                            sharedViewModel.applyAuthorFollowChange(change)
+                        }
+                    }
+                }
+                launch {
+                    FollowStatsCenter.fansCountUpdates.collectLatest { update ->
+                        val authorId = sharedViewModel.authorLive.value?.optString("userId").orEmpty()
+                        if (authorId.isNotEmpty() && authorId == update.userId) {
+                            sharedViewModel.applyAuthorFansCount(update.count)
+                        }
+                    }
+                }
             }
         }
     }

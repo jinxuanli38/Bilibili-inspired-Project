@@ -17,15 +17,12 @@ import com.example.bilibili.util.UiUtils.dp
  */
 object FollowActionButtonUi {
 
-    private const val COLOR_MUTUAL_TEXT = "#666666"
-    private const val COLOR_FOLLOWING_TEXT = "#999999"
+    private const val COLOR_FOLLOWED_TEXT = "#666666"
 
     fun bind(textView: TextView, focusType: Int) {
-        textView.setCompoundDrawablesRelative(null, null, null, null)
-        textView.compoundDrawablePadding = 0
         when (focusType) {
-            1 -> applyMutualFollow(textView)
-            2 -> applyFollowingCapsule(textView, "已关注")
+            1 -> applyFollowedCapsule(textView, "已互粉")
+            2 -> applyFollowedCapsule(textView, "已关注")
             else -> applyFollowPink(textView)
         }
     }
@@ -34,21 +31,24 @@ object FollowActionButtonUi {
         bind(textView, if (isMutual) 1 else 2)
     }
 
-    /**
-     * 已互粉：浅灰底、小圆角、图标+文案整体居中，无阴影。
-     * 个人页头部 [R.id.btn_focus] 为通栏宽度；列表等为右侧紧凑按钮。
-     */
-    private fun applyMutualFollow(textView: TextView) {
-        textView.text = "已互粉"
-        textView.setBackgroundResource(R.drawable.shape_follow_btn_mutual)
-        textView.backgroundTintList = null
+    /** 我的关注列表：只会是已互粉或已关注 */
+    fun bindForFollowingList(textView: TextView, focusType: Int) {
+        bind(textView, if (focusType == 1) 1 else 2)
+    }
+
+    /** 已互粉 / 已关注：同款浅灰胶囊 + 图标，仅文案不同 */
+    private fun applyFollowedCapsule(textView: TextView, label: String) {
         textView.elevation = 0f
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             textView.stateListAnimator = null
         }
-        textView.setTextColor(android.graphics.Color.parseColor(COLOR_MUTUAL_TEXT))
+        textView.text = label
+        textView.setBackgroundResource(R.drawable.shape_follow_btn_mutual)
+        textView.backgroundTintList = null
+        textView.setTextColor(android.graphics.Color.parseColor(COLOR_FOLLOWED_TEXT))
         textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
         textView.gravity = Gravity.CENTER
+
         val isProfileHeader = textView.id == R.id.btn_focus
         val hPad = if (isProfileHeader) 0 else 12.dp
         textView.setPadding(hPad, 0, hPad, 0)
@@ -57,7 +57,7 @@ object FollowActionButtonUi {
 
         val iconSize = 14.dp
         val icon = ContextCompat.getDrawable(textView.context, R.drawable.ic_follow_status_lines)?.mutate()
-        icon?.setTint(android.graphics.Color.parseColor(COLOR_MUTUAL_TEXT))
+        icon?.setTint(android.graphics.Color.parseColor(COLOR_FOLLOWED_TEXT))
         icon?.setBounds(0, 0, iconSize, iconSize)
         textView.compoundDrawablePadding = 6.dp
         textView.setCompoundDrawablesRelative(icon, null, null, null)
@@ -70,36 +70,6 @@ object FollowActionButtonUi {
             }
             if (this is ConstraintLayout.LayoutParams) {
                 horizontalBias = if (isProfileHeader) 0.5f else 1f
-            }
-        }
-    }
-
-    private fun applyFollowingCapsule(textView: TextView, label: String) {
-        textView.elevation = 0f
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            textView.stateListAnimator = null
-        }
-        textView.text = label
-        textView.setBackgroundResource(R.drawable.shape_follow_btn_following_capsule)
-        textView.backgroundTintList = null
-        textView.setTextColor(android.graphics.Color.parseColor(COLOR_FOLLOWING_TEXT))
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-        textView.gravity = Gravity.CENTER
-        textView.setPadding(10.dp, 0, 10.dp, 0)
-        textView.minHeight = 28.dp
-
-        val iconSize = 12.dp
-        val icon = ContextCompat.getDrawable(textView.context, R.drawable.ic_follow_status_lines)?.mutate()
-        icon?.setTint(android.graphics.Color.parseColor(COLOR_FOLLOWING_TEXT))
-        icon?.setBounds(0, 0, iconSize, iconSize)
-        textView.compoundDrawablePadding = 4.dp
-        textView.setCompoundDrawablesRelative(icon, null, null, null)
-
-        textView.updateLayoutParams<ViewGroup.LayoutParams> {
-            width = if (textView.id == R.id.btn_focus) {
-                ConstraintLayout.LayoutParams.MATCH_CONSTRAINT
-            } else {
-                ViewGroup.LayoutParams.WRAP_CONTENT
             }
         }
     }

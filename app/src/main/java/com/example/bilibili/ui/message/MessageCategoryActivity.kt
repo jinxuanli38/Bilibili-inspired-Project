@@ -179,14 +179,15 @@ class MessageCategoryActivity : AppCompatActivity() {
         if (item.sendUserId.isBlank()) return
         lifecycleScope.launch {
             try {
-                val response = JSONObject(postService.focus(item.sendUserId))
-                if (response.isSuccess()) {
+                val ok = com.example.bilibili.util.FocusActionHelper.setFocus(
+                    postService,
+                    item.sendUserId,
+                    follow = true,
+                )
+                if (ok) {
                     ToastUtils.showShort(this@MessageCategoryActivity, getString(R.string.message_follow_back_success))
                 } else {
-                    ToastUtils.showShort(
-                        this@MessageCategoryActivity,
-                        response.optString("info", "回关失败"),
-                    )
+                    ToastUtils.showShort(this@MessageCategoryActivity, "回关失败")
                 }
             } catch (e: Exception) {
                 ToastUtils.showShort(this@MessageCategoryActivity, e.message ?: "回关失败")

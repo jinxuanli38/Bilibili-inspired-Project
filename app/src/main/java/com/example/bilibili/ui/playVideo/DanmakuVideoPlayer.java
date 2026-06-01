@@ -785,6 +785,10 @@ public class DanmakuVideoPlayer extends StandardGSYVideoPlayer {
         }
     }
 
+    /**
+     * 按下进度条
+     * @param seekBar The SeekBar in which the touch gesture began
+     */
     @Override
     public void onStartTrackingTouch(SeekBar seekBar) {
         removeCallbacks(mSeekBarSettleRunnable);

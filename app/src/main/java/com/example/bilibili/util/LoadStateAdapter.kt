@@ -13,7 +13,17 @@ class LoadStateAdapter(
     private val endMessage: String? = null,
     private val showEndOnlyWhenHasItems: Boolean = false,
     private val itemCountProvider: () -> Int = { 0 },
+    private val refreshStateProvider: () -> LoadState = { LoadState.NotLoading(endOfPaginationReached = false) },
 ) : LoadStateAdapter<LoadStateAdapter.LoadStateViewHolder>() {
+
+    /** 刷新前已展示「没有更多了」时，下拉刷新期间保持 footer 不变，避免闪烁 */
+    private var showingEndFooter = false
+
+    private fun isRefreshInProgress(): Boolean =
+        refreshStateProvider() is LoadState.Loading
+
+    private fun shouldHoldEndDuringRefresh(): Boolean =
+        isRefreshInProgress() && showingEndFooter && itemCountProvider() > 0
 
     override fun onCreateViewHolder(parent: ViewGroup, loadState: LoadState): LoadStateViewHolder {
         val binding = ItemLoadStateBinding.inflate(
@@ -23,15 +33,40 @@ class LoadStateAdapter(
     }
 
     override fun onBindViewHolder(holder: LoadStateViewHolder, loadState: LoadState) {
-        holder.bind(loadState)
+        val bindState = resolveBindState(loadState)
+        holder.bind(bindState)
+    }
+
+    private fun resolveBindState(loadState: LoadState): LoadState {
+        if (shouldHoldEndDuringRefresh()) {
+            return LoadState.NotLoading(endOfPaginationReached = true)
+        }
+        when (loadState) {
+            is LoadState.NotLoading -> {
+                val showEnd = loadState.endOfPaginationReached &&
+                    (!showEndOnlyWhenHasItems || itemCountProvider() > 0)
+                showingEndFooter = showEnd
+            }
+            else -> {
+                if (!isRefreshInProgress()) showingEndFooter = false
+            }
+        }
+        return loadState
     }
 
     override fun displayLoadStateAsItem(loadState: LoadState): Boolean {
+        if (shouldHoldEndDuringRefresh()) return true
+
         return when (loadState) {
             is LoadState.Loading, is LoadState.Error -> true
             is LoadState.NotLoading -> {
-                if (!loadState.endOfPaginationReached) return false
-                !showEndOnlyWhenHasItems || itemCountProvider() > 0
+                if (!loadState.endOfPaginationReached) {
+                    if (!isRefreshInProgress()) showingEndFooter = false
+                    return false
+                }
+                val show = !showEndOnlyWhenHasItems || itemCountProvider() > 0
+                if (show) showingEndFooter = true
+                show
             }
         }
     }

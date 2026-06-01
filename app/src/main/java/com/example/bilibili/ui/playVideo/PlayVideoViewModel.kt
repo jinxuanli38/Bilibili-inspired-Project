@@ -181,10 +181,33 @@ class PlayVideoViewModel : ViewModel() {
         fileIdLive.postValue(part.fileId)
         videoUrlLive.postValue(buildVideoUrl(part.fileId))
         loadDanmuForPart(part.fileId, videoId)
+        loadPreviewForPart(part.fileId, part.duration)
     }
 
     private fun buildVideoUrl(fileId: String): String {
         return "${RetrofitClient.BASE_URL}file/videoResource/$fileId/index.m3u8"
+    }
+
+    /**
+     * 每个分 P 各自目录下有 preview.jpg，接口为 /file/videoPreview/{fileId}。
+     * getVideoInfo 里的 previewConfig 固定用第一个 fileId，切换分 P 时必须按当前 fileId 重载。
+     */
+    private fun buildPreviewConfig(fileId: String, durationSeconds: Int): PreviewConfigEntity {
+        val duration = durationSeconds.coerceAtLeast(1)
+        return PreviewConfigEntity(
+            url = "${RetrofitClient.BASE_URL}file/videoPreview/$fileId",
+            total = 400,
+            col = 10,
+            row = 40,
+            frameW = 160,
+            frameH = 90,
+            interval = duration.toDouble() / 400.0,
+        )
+    }
+
+    private fun loadPreviewForPart(fileId: String, durationSeconds: Int) {
+        if (fileId.isBlank()) return
+        previewConfigLive.postValue(buildPreviewConfig(fileId, durationSeconds))
     }
 
     private fun loadDanmuForPart(fileId: String, videoId: String) {
@@ -284,21 +307,6 @@ class PlayVideoViewModel : ViewModel() {
                         videoInfo.optString("videoId")
                     )
 
-                    // 提取雪碧图相关设置
-                    if (data.has("previewConfig")) {
-                        val configJson = data.getJSONObject("previewConfig")
-                        val entity = PreviewConfigEntity(
-                            url = configJson.optString("url"),
-                            total = configJson.optInt("total", 400),
-                            col = configJson.optInt("col", 10),
-                            row = configJson.optInt("row", 40),
-                            frameW = configJson.optInt("frameW", 160),
-                            frameH = configJson.optInt("frameH", 90),
-                            interval = configJson.optDouble("interval", 0.0) // 动态抓取变化的值
-                        )
-                        previewConfigLive.postValue(entity)
-                    }
-
                     // 拿到 userId 去请求作者信息
                     val userId = videoInfo.getString("userId")
                     val uRes = withContext(Dispatchers.IO) { postService.getUserInfo(userId) }
@@ -325,6 +333,7 @@ class PlayVideoViewModel : ViewModel() {
                         fileIdLive.postValue(first.fileId)
                         videoUrlLive.postValue(buildVideoUrl(first.fileId))
                         loadDanmuForPart(first.fileId, videoId)
+                        loadPreviewForPart(first.fileId, first.duration)
                     }
                 }
             } catch (e: Exception) {
@@ -342,22 +351,52 @@ class PlayVideoViewModel : ViewModel() {
         val currentType = focusTypeLive.value ?: 0
         val newState = !currentState
         val newType = if (newState) 2 else 0
+        val previousAuthor = authorLive.value
 
         isFollowedLive.value = newState
         focusTypeLive.value = newType
+        if (previousAuthor != null) {
+            val delta = if (newState) 1 else -1
+            authorLive.value = bumpAuthorFans(previousAuthor, delta)
+        }
 
         viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    if (newState) postService.focus(authorId)
-                    else postService.cancelFocus(authorId)
-                }
-            } catch (_: Exception) {
+            val ok = com.example.bilibili.util.FocusActionHelper.setFocus(
+                postService,
+                authorId,
+                newState,
+            )
+            if (!ok) {
                 isFollowedLive.postValue(currentState)
                 focusTypeLive.postValue(currentType)
+                if (previousAuthor != null) {
+                    authorLive.postValue(previousAuthor)
+                }
                 errorLive.postValue("操作失败，请检查网络")
             }
         }
+    }
+
+    fun applyAuthorFansCount(count: Int) {
+        val author = authorLive.value ?: return
+        authorLive.value = author.put("fansCount", count.coerceAtLeast(0))
+    }
+
+    fun applyAuthorFollowChange(change: com.example.bilibili.ui.user.FollowStatsCenter.FollowChange) {
+        val author = authorLive.value ?: return
+        if (author.optString("userId") != change.targetUserId) return
+        val delta = if (change.followed) 1 else -1
+        authorLive.value = bumpAuthorFans(author, delta)
+    }
+
+    private fun bumpAuthorFans(author: JSONObject, delta: Int): JSONObject {
+        val updated = JSONObject(author.toString())
+        val next = com.example.bilibili.ui.user.FollowStatsCenter.adjustFansCount(
+            author.optInt("fansCount"),
+            delta,
+        )
+        updated.put("fansCount", next)
+        return updated
     }
 
     /**
@@ -533,14 +572,7 @@ class PlayVideoViewModel : ViewModel() {
                 val actionMap = userActions.associateBy({ it.commentId }, { it.actionType })
 
                 // 5. 遍历评论列表，把 actionType 状态匹配进去
-                allComments.forEach { comment ->
-                    matchAndAssignStatus(comment, actionMap)
-
-                    // 处理二级评论（楼中楼）
-                    comment.children?.forEach { child ->
-                        matchAndAssignStatus(child, actionMap)
-                    }
-                }
+                allComments.forEach { applyUserActionsRecursively(it, actionMap) }
 
                 // 6. 使用服务端返回的排序（orderType: 0-热度，1-时间）
                 commentListLive.postValue(allComments)
@@ -566,6 +598,11 @@ class PlayVideoViewModel : ViewModel() {
             item.isLiked = false
             item.isHated = false
         }
+    }
+
+    private fun applyUserActionsRecursively(item: CommentItem, actionMap: Map<Int, Int>) {
+        matchAndAssignStatus(item, actionMap)
+        item.children?.forEach { child -> applyUserActionsRecursively(child, actionMap) }
     }
 
     // 手动解析弹幕

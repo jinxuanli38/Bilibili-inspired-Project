@@ -22,13 +22,16 @@ private class HorizontalParentScrollTouchListener : RecyclerView.SimpleOnItemTou
     private var disallowParent = false
 
     override fun onInterceptTouchEvent(rv: RecyclerView, event: MotionEvent): Boolean {
+        // 计算防手抖像素检测
         if (touchSlop == 0) {
             touchSlop = ViewConfiguration.get(rv.context).scaledTouchSlop
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                // 获得刚点下去的x轴和y轴坐标位置
                 initialX = event.x
                 initialY = event.y
+                // 查看是否还能继续滑动
                 disallowParent = rv.canScrollHorizontally(-1) || rv.canScrollHorizontally(1)
                 requestParentDisallowIntercept(rv, disallowParent)
             }
@@ -65,6 +68,7 @@ private class HorizontalParentScrollTouchListener : RecyclerView.SimpleOnItemTou
     private fun requestParentDisallowIntercept(child: RecyclerView, disallow: Boolean) {
         var parent: ViewParent? = child.parent
         while (parent != null) {
+            // 父类禁止拦截横向滑动事件
             parent.requestDisallowInterceptTouchEvent(disallow)
             parent = parent.parent
         }

@@ -23,7 +23,7 @@ object PagingUiHelper {
         contentAdapter: PagingDataAdapter<*, *>,
         onRetry: () -> Unit
     ) {
-        val footerAdapter = LoadStateAdapter(onRetry)
+        val footerAdapter = createFooterAdapter(contentAdapter, onRetry)
         val concatAdapter = contentAdapter.withLoadStateFooter(footerAdapter)
         val gridManager = GridLayoutManager(recyclerView.context, spanCount)
         gridManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
@@ -45,14 +45,35 @@ object PagingUiHelper {
         endMessage: String? = null,
         showEndOnlyWhenHasItems: Boolean = false,
     ) {
+        val footerAdapter = createFooterAdapter(
+            contentAdapter = contentAdapter,
+            onRetry = onRetry,
+            endMessage = endMessage,
+            showEndOnlyWhenHasItems = showEndOnlyWhenHasItems,
+        )
+        recyclerView.layoutManager = LinearLayoutManager(recyclerView.context)
+        recyclerView.adapter = contentAdapter.withLoadStateFooter(footerAdapter)
+    }
+
+    private fun createFooterAdapter(
+        contentAdapter: PagingDataAdapter<*, *>,
+        onRetry: () -> Unit,
+        endMessage: String? = null,
+        showEndOnlyWhenHasItems: Boolean = false,
+    ): LoadStateAdapter {
+        var refreshLoadState: LoadState = LoadState.NotLoading(endOfPaginationReached = false)
         val footerAdapter = LoadStateAdapter(
             retry = onRetry,
             endMessage = endMessage,
             showEndOnlyWhenHasItems = showEndOnlyWhenHasItems,
             itemCountProvider = { contentAdapter.itemCount },
+            refreshStateProvider = { refreshLoadState },
         )
-        recyclerView.layoutManager = LinearLayoutManager(recyclerView.context)
-        recyclerView.adapter = contentAdapter.withLoadStateFooter(footerAdapter)
+        contentAdapter.addLoadStateListener { state ->
+            refreshLoadState = state.refresh
+            footerAdapter.notifyDataSetChanged()
+        }
+        return footerAdapter
     }
 
     /** 刷新完成且确实无数据时才视为空态 */

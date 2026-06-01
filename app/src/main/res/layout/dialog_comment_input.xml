@@ -24,7 +24,8 @@
         android:paddingBottom="4dp"
         android:textColor="#333333"
         android:textColorHint="#CCCCCC"
-        android:textSize="15sp" />
+        android:textSize="15sp"
+        android:theme="@style/BilibiliEditTextStyle" />
 
     <RelativeLayout
         android:id="@+id/layout_bottom_toolbar"

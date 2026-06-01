@@ -6,7 +6,7 @@
 
 ## Android（本仓库已修复）
 
-- `CategoryPartitionHelper.readVideoCategoryIds`：兼容 `pCategoryId` / `p_category_id` 等字段。
+- `CategoryPartitionHelper.readVideoCategoryIds`：兼容 **`pcategoryId`**（`getVideoInfoByVideoId` 实际返回）、`pCategoryId`、`p_category_id` 等。
 - `resolveFromIds`：支持仅存在二级 `categoryId` 时在分类树反查一级分区；校验接口 `success`/`code==200`。
 - `loadVideoForEdit`：一级或二级任一有值即拉取分类树并 `selectedPartition` 回填。
 
@@ -25,3 +25,11 @@ public List<CategoryInfo> getAllCategoryInfo() {
     return categoryInfoList == null ? Collections.emptyList() : categoryInfoList;
 }
 ```
+
+已在 `Downloads/easylive-main/.../CategoryInfoServiceImpl.java` 应用。
+
+## Android 补充（2025）
+
+- 编辑时缓存 `editPCategoryId` / `editCategoryId`，解析失败仍可保存。
+- `effectiveCategoryIds()` 提交时用缓存 ID。
+- `applyPartitionForEdit` 清分类缓存并重试解析名称。

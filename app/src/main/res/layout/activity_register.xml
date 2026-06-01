@@ -231,11 +231,10 @@
         android:layout_width="0dp"
         android:layout_height="60dp"
         android:background="@null"
-        android:digits="0123456789"
         android:hint="@string/input_verifyCode"
         android:imeOptions="actionDone"
-        android:inputType="number"
-        android:maxLength="6"
+        android:inputType="numberSigned"
+        android:maxLength="8"
         android:textColorHint="#CCCCCC"
         android:textSize="16sp"
 

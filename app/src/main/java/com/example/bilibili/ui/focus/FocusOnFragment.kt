@@ -86,9 +86,11 @@ class FocusOnFragment : Fragment() {
             .setTitle("取消关注")
             .setMessage("确定要取消关注 ${user.otherNickName} 吗？")
             .setPositiveButton("确定") { _, _ ->
-                viewModel.cancelFollow(user.otherUserId)
-                // 注意：Paging3中需要手动刷新数据
-                focusAdapter.refresh()
+                viewLifecycleOwner.lifecycleScope.launch {
+                    if (viewModel.cancelFollow(user.otherUserId)) {
+                        focusAdapter.refresh()
+                    }
+                }
             }
             .setNegativeButton("取消", null)
             .show()

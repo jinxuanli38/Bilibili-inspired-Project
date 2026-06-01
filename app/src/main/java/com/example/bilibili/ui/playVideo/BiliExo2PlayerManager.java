@@ -30,8 +30,11 @@ import tv.danmaku.ijk.media.player.IMediaPlayer;
 @UnstableApi
 public class BiliExo2PlayerManager extends BasePlayerManager {
 
+    // 当前播放器的缓冲策略
     private static final LoadControl BILI_LOAD_CONTROL = new DefaultLoadControl.Builder()
+            // minBufferMs则是指最小缓冲，播许攒够30s才会停止拉流，maxBufferMs最大缓冲，为了省流量，buffer，bufferForPlaybackMs指的是开始播放缓冲2.5秒，而bufferForPlaybackAfterRebufferMs是指卡顿后缓冲时长
             .setBufferDurationsMs(30_000, 120_000, 2_500, 5_000)
+            // 时间优先，但内部有内存熔断策略。
             .setPrioritizeTimeOverSizeThresholds(true)
             .build();
 

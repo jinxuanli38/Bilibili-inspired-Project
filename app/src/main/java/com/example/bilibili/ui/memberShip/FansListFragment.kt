@@ -12,17 +12,23 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.LoadState
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.bilibili.R
 import com.example.bilibili.data.model.UserFriend
 import com.example.bilibili.databinding.DialogFanMoreBinding
 import com.example.bilibili.databinding.FragmentFriendListTabBinding
+import com.example.bilibili.ui.friends.MyFriendsViewModel
 import com.example.bilibili.ui.user.UserProfileActivity
+import com.example.bilibili.util.FollowConfirmDialog
+import com.example.bilibili.util.FollowRelationRefreshTracker
 import com.example.bilibili.util.PagingUiHelper
-import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.example.bilibili.util.BilibiliBottomSheetDialog
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -33,7 +39,9 @@ class FansListFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val viewModel: FansViewModel by viewModels()
+    private val friendsViewModel: MyFriendsViewModel by activityViewModels()
     private lateinit var adapter: FansPagingAdapter
+    private val followRefreshTracker = FollowRelationRefreshTracker()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -84,6 +92,33 @@ class FansListFragment : Fragment() {
                 updateFansSummary(adapter.itemCount)
             }
         }
+
+        observeSharedListRefresh()
+        followRefreshTracker.sync()
+    }
+
+    override fun onPause() {
+        followRefreshTracker.onPause()
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        followRefreshTracker.onResumeIfChanged {
+            if (_binding != null && ::adapter.isInitialized) {
+                adapter.refresh()
+            }
+        }
+    }
+
+    private fun observeSharedListRefresh() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                friendsViewModel.refreshLists.collectLatest {
+                    adapter.refresh()
+                }
+            }
+        }
     }
 
     private fun updateFansSummary(count: Int) {
@@ -106,7 +141,7 @@ class FansListFragment : Fragment() {
 
     private fun showFanMoreBottomSheet(user: UserFriend) {
         val sheetBinding = DialogFanMoreBinding.inflate(layoutInflater)
-        val dialog = BottomSheetDialog(requireContext(), R.style.TransparentBottomSheetStyle)
+        val dialog = BilibiliBottomSheetDialog(requireContext())
         dialog.setContentView(sheetBinding.root)
 
         sheetBinding.rowRemoveFan.setOnClickListener {
@@ -144,37 +179,27 @@ class FansListFragment : Fragment() {
     }
 
     private fun showFollowConfirmDialog(user: UserFriend) {
-        AlertDialog.Builder(requireContext(), R.style.PinkDialogTheme)
-            .setTitle("关注提示")
-            .setMessage("确定要关注 ${user.otherNickName} 吗？")
-            .setPositiveButton("确定") { _, _ ->
-                viewLifecycleOwner.lifecycleScope.launch {
-                    if (viewModel.followUser(user.otherUserId)) {
-                        adapter.refresh()
-                    } else {
-                        Toast.makeText(context, "关注失败，请重试", Toast.LENGTH_SHORT).show()
-                    }
+        FollowConfirmDialog.show(requireContext(), user.otherNickName, currentlyFocused = false) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                if (viewModel.followUser(user.otherUserId)) {
+                    friendsViewModel.notifyFollowRelationChanged()
+                } else {
+                    Toast.makeText(context, "关注失败，请重试", Toast.LENGTH_SHORT).show()
                 }
             }
-            .setNegativeButton("取消", null)
-            .show()
+        }
     }
 
     private fun showCancelFollowDialog(user: UserFriend) {
-        AlertDialog.Builder(requireContext(), R.style.PinkDialogTheme)
-            .setTitle("取消关注")
-            .setMessage("确定要取消关注 ${user.otherNickName} 吗？")
-            .setPositiveButton("确定") { _, _ ->
-                viewLifecycleOwner.lifecycleScope.launch {
-                    if (viewModel.cancelFollow(user.otherUserId)) {
-                        adapter.refresh()
-                    } else {
-                        Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
-                    }
+        FollowConfirmDialog.show(requireContext(), user.otherNickName, currentlyFocused = true) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                if (viewModel.cancelFollow(user.otherUserId)) {
+                    friendsViewModel.notifyFollowRelationChanged()
+                } else {
+                    Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
                 }
             }
-            .setNegativeButton("取消", null)
-            .show()
+        }
     }
 
     override fun onDestroyView() {

@@ -28,7 +28,7 @@ class AllMessagePagingSource : PagingSource<Int, UserMessageItem>() {
                 list.add(UserMessageItem.fromJson(listArray.getJSONObject(i)))
             }
             LoadResult.Page(
-                data = list,
+                data = FanMessageDedupe.dedupe(list),
                 prevKey = if (page == 1) null else page - 1,
                 nextKey = PagingDefaults.nextPageKey(data, page, list.size),
             )

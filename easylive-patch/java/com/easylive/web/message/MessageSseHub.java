@@ -66,6 +66,30 @@ public class MessageSseHub implements UserMessagePushService {
         send(userId, payload);
     }
 
+    @Override
+    public void onFansCountChanged(String userId, int fansCount) {
+        if (userId == null || userId.isEmpty()) {
+            return;
+        }
+        SsePayload payload = new SsePayload();
+        payload.event = "fans_count";
+        payload.userId = userId;
+        payload.fansCount = fansCount;
+        send(userId, payload);
+    }
+
+    @Override
+    public void onFocusCountChanged(String userId, int focusCount) {
+        if (userId == null || userId.isEmpty()) {
+            return;
+        }
+        SsePayload payload = new SsePayload();
+        payload.event = "focus_count";
+        payload.userId = userId;
+        payload.focusCount = focusCount;
+        send(userId, payload);
+    }
+
     private void sendSync(String userId, SseEmitter emitter) throws IOException {
         SsePayload payload = new SsePayload();
         payload.event = "sync";
@@ -115,5 +139,8 @@ public class MessageSseHub implements UserMessagePushService {
         public Integer messageType;
         public Integer readType;
         public List<UserMessageCountDto> counts;
+        public String userId;
+        public Integer fansCount;
+        public Integer focusCount;
     }
 }

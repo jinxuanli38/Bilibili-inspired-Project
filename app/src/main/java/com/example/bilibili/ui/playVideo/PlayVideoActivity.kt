@@ -29,7 +29,6 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.target.CustomTarget
-import com.bumptech.glide.request.target.Target
 import com.bumptech.glide.request.transition.Transition
 import com.example.bilibili.MainActivity
 import com.example.bilibili.R
@@ -45,7 +44,7 @@ import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.ToastUtils
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.example.bilibili.util.VideoDataUtils
-import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.example.bilibili.util.BilibiliBottomSheetDialog
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import com.shuyu.gsyvideoplayer.GSYVideoManager.releaseAllVideos
@@ -75,8 +74,8 @@ class PlayVideoActivity : AppCompatActivity() {
     // 当前雪碧图的相关配置
     private var currentPreviewConfig: PreviewConfigEntity? = null
 
-    // 雪碧图大图（只加载一次，拖动进度条时只改 Matrix）
     private var previewSpriteBitmap: Bitmap? = null
+    private var loadedPreviewSpriteUrl: String? = null
 
     private var wasPlayingBeforeBackground = false
 
@@ -112,6 +111,7 @@ class PlayVideoActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         savedInstanceState?.let {
+            // 恢复状态
             lastPlayPositionMs = it.getLong(KEY_PLAY_POSITION, 0L)
             wasPlayingBeforeBackground = it.getBoolean(KEY_WAS_PLAYING, false)
             if (lastPlayPositionMs > 0) {
@@ -154,11 +154,13 @@ class PlayVideoActivity : AppCompatActivity() {
                     CommentAnchor(
                         sendUserId = intent.getStringExtra(EXTRA_ANCHOR_SEND_USER_ID).orEmpty(),
                         content = intent.getStringExtra(EXTRA_ANCHOR_CONTENT).orEmpty(),
+                        parentCommentId = intent.getIntExtra(EXTRA_ANCHOR_COMMENT_ID, 0),
                     ),
                 )
             }
             viewModel.fetchAllData(videoId)
             if (intent.getBooleanExtra(EXTRA_OPEN_COMMENT_TAB, false)) {
+                // 直接跳转过去，不用滚动。
                 binding.viewPager.post { binding.viewPager.setCurrentItem(1, false) }
             }
         } else {
@@ -178,8 +180,11 @@ class PlayVideoActivity : AppCompatActivity() {
 
         initDanmuSwitch()
 
+        // 开启自动适配界面
         binding.videoPlayer.setAutoFullWithSize(true)
+        // 关闭自动旋转
         binding.videoPlayer.setRotateViewAuto(false)
+        // 不使用gsy默认的视频播放器
         binding.videoPlayer.setNeedOrientationUtils(false)
 
         // 全屏：仅窗口内放大，不旋转到横屏
@@ -231,6 +236,9 @@ class PlayVideoActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 通常指播放结束后的推荐视频
+     */
     private fun bindEndRecommendCard(item: RecommendVideoItem?) {
         val player = binding.videoPlayer
         val card = player.findViewById<View>(R.id.layout_end_recommend_card) ?: return
@@ -280,7 +288,9 @@ class PlayVideoActivity : AppCompatActivity() {
         GlideEngine.loadVideoCover(this, item.videoCover, coverView)
     }
 
-    /** 无推荐时把重播居中；有推荐时重播在左下角 */
+    /**
+     * 无推荐时把重播居中；有推荐时重播在左下角
+     */
     private fun layoutEndReplayCentered(replayBtn: View, centered: Boolean) {
         val lp = replayBtn.layoutParams as? ConstraintLayout.LayoutParams ?: return
         if (centered) {
@@ -306,18 +316,19 @@ class PlayVideoActivity : AppCompatActivity() {
 
     /** 不要覆盖 GSY 的 SeekBar 监听器；通过播放器回调统一处理预览 */
     private fun setupPreviewSeekListener() {
-        binding.videoPlayer.setOnPreviewSeekListener(object :
-            DanmakuVideoPlayer.OnPreviewSeekListener {
+        binding.videoPlayer.setOnPreviewSeekListener(object : DanmakuVideoPlayer.OnPreviewSeekListener {
+            // 手指点击进度条
             override fun onSeekStart() {
                 if (currentPreviewConfig != null) {
                     getPreviewLayout()?.visibility = View.VISIBLE
                 }
             }
-
+            // 手指拖动进度条
             override fun onSeekPreview(seekTimeMs: Long, totalTimeMs: Long) {
                 updatePreviewAtTime(seekTimeMs, totalTimeMs)
             }
 
+            // 手指离开屏幕
             override fun onSeekEnd() {
                 getPreviewLayout()?.visibility = View.GONE
             }
@@ -422,7 +433,7 @@ class PlayVideoActivity : AppCompatActivity() {
     }
 
     private fun danmuSheetDialog() {
-        val bottomSheetDialog = BottomSheetDialog(this, R.style.TransparentBottomSheetStyle)
+        val bottomSheetDialog = BilibiliBottomSheetDialog(this)
         val dialogBinding = DialogDanmuSettingBinding.inflate(layoutInflater)
         bottomSheetDialog.setContentView(dialogBinding.root)
 
@@ -552,16 +563,23 @@ class PlayVideoActivity : AppCompatActivity() {
             // 从后台回来 LiveData 会再回调一次，不能再次 initPlayer 否则从头播
             if (sameUrl) {
                 if (binding.videoPlayer.currentPlayer != null) {
+                    // 恢复播放器
                     restorePlaybackIfNeeded()
                 } else {
+                    // 重新初始化播放器
                     reinitPlayerAtLastPosition(url)
                 }
                 return@observe
             }
+            // 弹幕列表状态
             danmakuListReady = false
+            // 待播放的url
             pendingPlayUrl = url
+            // 等待播放的跳转进度
             pendingPlaySeekMs = if (shouldRestorePlayback) lastPlayPositionMs else 0L
+            // 恢复播放状态改成false
             shouldRestorePlayback = false
+            // 尝试启动播放器
             tryStartPlayerWhenReady()
         }
 
@@ -597,13 +615,17 @@ class PlayVideoActivity : AppCompatActivity() {
         }
     }
 
-    /** 雪碧图只下载一次；CustomTarget 必须配合 asBitmap() 并指定宽高 */
+    /** 按当前分 P 的 fileId 加载对应 preview.jpg；切换分 P 时换 URL 并重新下载 */
     private fun loadPreviewSprite(url: String) {
+        if (url == loadedPreviewSpriteUrl && previewSpriteBitmap != null) return
+        loadedPreviewSpriteUrl = url
+        previewSpriteBitmap = null
         Glide.with(this)
             .asBitmap()
             .load(url)
             .into(object : CustomTarget<Bitmap>(SIZE_ORIGINAL, SIZE_ORIGINAL) {
                 override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
+                    if (url != loadedPreviewSpriteUrl) return
                     previewSpriteBitmap = resource
                 }
 
@@ -613,6 +635,9 @@ class PlayVideoActivity : AppCompatActivity() {
             })
     }
 
+    /**
+     * 根据拖动的进度来显示不同的雪碧图
+     */
     private fun updatePreviewAtTime(currentTimeMs: Long, totalTimeMs: Long) {
         val config = currentPreviewConfig ?: return
         val previewImage = getPreviewImage() ?: return
@@ -723,7 +748,9 @@ class PlayVideoActivity : AppCompatActivity() {
         }
     }
 
-    /** 弹幕先 prepare，再开播，与 GSY 官方一致，避免视频先跑、弹幕后 seek 弹回 */
+    /**
+     * 先prepare准备弹幕然后再开播。
+     */
     private fun tryStartPlayerWhenReady() {
         val url = pendingPlayUrl ?: return
         if (!danmakuListReady) return
@@ -765,13 +792,19 @@ class PlayVideoActivity : AppCompatActivity() {
         }, 150)
     }
 
+    /**
+     * 快照播放进度，用于恢复播放
+     */
     private fun snapshotPlaybackState() {
         try {
+            // 获取播放进度
             val pos = binding.videoPlayer.currentPositionWhenPlaying
             if (pos > 0) {
                 lastPlayPositionMs = pos
             }
+            // 获取播放状态
             val state = binding.videoPlayer.currentPlayer?.currentState
+            // 判断当前是否播放状态
             wasPlayingBeforeBackground = state == GSYVideoView.CURRENT_STATE_PLAYING
         } catch (e: Exception) {
             e.printStackTrace()
@@ -816,6 +849,8 @@ class PlayVideoActivity : AppCompatActivity() {
         pendingPlayUrl = null
         playCountRefreshJob?.cancel()
         previewSpriteBitmap = null
+        loadedPreviewSpriteUrl = null
+        currentPreviewConfig = null
         releasePlayerBeforeSwitch()
         viewModel.fetchAllData(videoId)
     }
@@ -830,6 +865,9 @@ class PlayVideoActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 重新初始化播放器（通常指播放器被后台杀掉了）
+     */
     private fun reinitPlayerAtLastPosition(url: String) {
         danmakuListReady = cachedDanmakuList != null
         pendingPlayUrl = url
@@ -837,12 +875,16 @@ class PlayVideoActivity : AppCompatActivity() {
         tryStartPlayerWhenReady()
     }
 
+    /**
+     * 恢复播放器
+     */
     private fun restorePlaybackIfNeeded() {
         if (!shouldRestorePlayback) return
         shouldRestorePlayback = false
         val url = currentVideoUrl
         try {
             val player = binding.videoPlayer
+            // 重新初始化播放器
             if (!url.isNullOrEmpty() && player.currentPlayer == null) {
                 reinitPlayerAtLastPosition(url)
                 return
@@ -859,6 +901,7 @@ class PlayVideoActivity : AppCompatActivity() {
                 if (livePos + 800 < targetPos) {
                     player.seekTo(targetPos)
                 }
+                // 立刻同步弹幕
                 player.syncDanmakuOnce(targetPos)
             }
         } catch (e: Exception) {
@@ -866,10 +909,16 @@ class PlayVideoActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 保留实例方法
+     */
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
+        // 快照
         snapshotPlaybackState()
+        // 保存播放进度
         outState.putLong(KEY_PLAY_POSITION, lastPlayPositionMs)
+        // 保存是否播放
         outState.putBoolean(KEY_WAS_PLAYING, wasPlayingBeforeBackground)
     }
 
@@ -899,6 +948,7 @@ class PlayVideoActivity : AppCompatActivity() {
         const val EXTRA_OPEN_COMMENT_TAB = "open_comment_tab"
         const val EXTRA_ANCHOR_SEND_USER_ID = "anchor_send_user_id"
         const val EXTRA_ANCHOR_CONTENT = "anchor_content"
+        const val EXTRA_ANCHOR_COMMENT_ID = "anchor_comment_id"
 
         private const val KEY_PLAY_POSITION = "play_position"
         private const val KEY_WAS_PLAYING = "was_playing"

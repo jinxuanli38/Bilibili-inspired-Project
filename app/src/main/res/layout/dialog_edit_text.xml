@@ -18,7 +18,6 @@
         android:minHeight="48dp"
         android:gravity="center_vertical"
         android:paddingVertical="8dp"
-        android:textCursorDrawable="@drawable/cursor_drawable"
         android:imeOptions="actionDone"
         android:inputType="text"
         android:importantForAutofill="no"

@@ -1,5 +1,6 @@
 package com.example.bilibili.widget
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -13,14 +14,16 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.animation.DecelerateInterpolator
 import kotlin.math.abs
 import com.example.bilibili.data.model.ChartPoint
 import java.util.Locale
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * 轻量折线图：近 7 日数据，支持滑动查看当日数值气泡。
+ * 轻量折线图：近 7 日数据，支持负值 Y 轴、从左向右绘制动画、滑动查看当日数值气泡。
  */
 class SimpleLineChartView @JvmOverloads constructor(
     context: Context,
@@ -48,6 +51,11 @@ class SimpleLineChartView @JvmOverloads constructor(
     }
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#EEEEEE")
+        strokeWidth = dp(1f)
+        style = Paint.Style.STROKE
+    }
+    private val zeroLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#DDDDDD")
         strokeWidth = dp(1f)
         style = Paint.Style.STROKE
     }
@@ -92,6 +100,8 @@ class SimpleLineChartView @JvmOverloads constructor(
     private var points: List<ChartPoint> = emptyList()
     private var valueLabel: String = ""
     private var selectedIndex: Int? = null
+    private var revealProgress = 1f
+    private var revealAnimator: ValueAnimator? = null
     private val linePath = Path()
     private val fillPath = Path()
     private val bubbleRect = RectF()
@@ -106,15 +116,31 @@ class SimpleLineChartView @JvmOverloads constructor(
     private var touchDownY = 0f
     private var isHorizontalDrag = false
 
-    fun setData(data: List<ChartPoint>, metricLabel: String = "") {
+    fun setData(data: List<ChartPoint>, metricLabel: String = "", animate: Boolean = true) {
+        revealAnimator?.cancel()
         removeCallbacks(dismissHighlightRunnable)
         points = data
         valueLabel = metricLabel
         selectedIndex = null
-        invalidate()
+        if (animate && data.isNotEmpty()) {
+            revealProgress = 0f
+            revealAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = REVEAL_DURATION_MS
+                interpolator = DecelerateInterpolator()
+                addUpdateListener {
+                    revealProgress = animatedValue as Float
+                    invalidate()
+                }
+                start()
+            }
+        } else {
+            revealProgress = 1f
+            invalidate()
+        }
     }
 
     override fun onDetachedFromWindow() {
+        revealAnimator?.cancel()
         removeCallbacks(dismissHighlightRunnable)
         super.onDetachedFromWindow()
     }
@@ -156,7 +182,8 @@ class SimpleLineChartView @JvmOverloads constructor(
     }
 
     private fun updateSelection(touchX: Float, geometry: ChartGeometry) {
-        val index = indexForTouchX(touchX, geometry)
+        val maxIndex = visibleEndIndex(revealProgress)
+        val index = indexForTouchX(touchX, geometry).coerceAtMost(maxIndex)
         if (selectedIndex != index) {
             selectedIndex = index
             invalidate()
@@ -177,6 +204,16 @@ class SimpleLineChartView @JvmOverloads constructor(
         return (ratio * (points.size - 1)).roundToInt().coerceIn(0, points.size - 1)
     }
 
+    private fun visibleEndIndex(progress: Float): Int {
+        if (points.size <= 1) return 0
+        return revealEndFloat(progress).toInt().coerceIn(0, points.lastIndex)
+    }
+
+    private fun revealEndFloat(progress: Float): Float {
+        if (points.size <= 1) return 0f
+        return (points.size - 1) * progress.coerceIn(0f, 1f)
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (width <= 0 || height <= 0) return
@@ -189,12 +226,15 @@ class SimpleLineChartView @JvmOverloads constructor(
         val geometry = computeGeometry() ?: return
 
         drawGrid(canvas, geometry)
+        drawZeroLine(canvas, geometry)
         drawFill(canvas, geometry)
         drawLine(canvas, geometry)
         drawPoints(canvas, geometry)
 
         val highlightIndex = selectedIndex
-        if (highlightIndex != null && highlightIndex in points.indices) {
+        if (highlightIndex != null && highlightIndex in points.indices &&
+            highlightIndex <= visibleEndIndex(revealProgress)
+        ) {
             drawHighlight(canvas, geometry, highlightIndex)
         }
     }
@@ -214,34 +254,73 @@ class SimpleLineChartView @JvmOverloads constructor(
         }
     }
 
-    /** 全为 0 时用 0～1 小数刻度；有数据时用整数刻度。 */
+    private fun drawZeroLine(canvas: Canvas, geometry: ChartGeometry) {
+        if (geometry.minValue >= 0) return
+        val zeroY = valueToY(0, geometry)
+        canvas.drawLine(geometry.left, zeroY, geometry.right, zeroY, zeroLinePaint)
+    }
+
     private fun formatYAxisLabel(geometry: ChartGeometry, index: Int, divisions: Int): String {
         val ratio = (divisions - index).toFloat() / divisions.toFloat()
-        if (geometry.useNormalizedScale) {
-            val value = ratio * geometry.scaleMax
-            return when {
-                value <= 0f -> "0"
-                value >= 1f -> "1"
-                else -> String.format(Locale.getDefault(), "%.1f", value)
+        val value = geometry.minValue + geometry.valueRange * ratio
+        return value.roundToInt().toString()
+    }
+
+    private fun buildRevealPath(
+        geometry: ChartGeometry,
+        closeToBottom: Boolean,
+        outPath: Path,
+    ) {
+        outPath.reset()
+        if (points.isEmpty()) return
+
+        val endF = revealEndFloat(revealProgress)
+        val endI = endF.toInt().coerceIn(0, points.lastIndex)
+        val frac = endF - endI
+
+        fun appendPoint(index: Int, x: Float, y: Float) {
+            if (index == 0) {
+                if (closeToBottom) {
+                    outPath.moveTo(x, geometry.bottom)
+                    outPath.lineTo(x, y)
+                } else {
+                    outPath.moveTo(x, y)
+                }
+            } else {
+                outPath.lineTo(x, y)
             }
         }
-        return (geometry.maxValue * ratio).roundToInt().toString()
+
+        for (index in 0..endI) {
+            appendPoint(index, geometry.xForIndex(index), valueToY(points[index].value, geometry))
+        }
+
+        if (frac > 0f && endI < points.lastIndex) {
+            val next = endI + 1
+            val x0 = geometry.xForIndex(endI)
+            val x1 = geometry.xForIndex(next)
+            val y0 = valueToY(points[endI].value, geometry)
+            val y1 = valueToY(points[next].value, geometry)
+            val x = x0 + (x1 - x0) * frac
+            val y = y0 + (y1 - y0) * frac
+            appendPoint(next, x, y)
+            if (closeToBottom) {
+                outPath.lineTo(x, geometry.bottom)
+            }
+        } else if (closeToBottom && endI >= 0) {
+            val x = geometry.xForIndex(endI)
+            outPath.lineTo(x, geometry.bottom)
+        }
+
+        if (closeToBottom) {
+            val startX = geometry.xForIndex(0)
+            outPath.lineTo(startX, geometry.bottom)
+            outPath.close()
+        }
     }
 
     private fun drawFill(canvas: Canvas, geometry: ChartGeometry) {
-        fillPath.reset()
-        points.forEachIndexed { index, point ->
-            val x = geometry.xForIndex(index)
-            val y = valueToY(point.value, geometry)
-            if (index == 0) {
-                fillPath.moveTo(x, geometry.bottom)
-                fillPath.lineTo(x, y)
-            } else {
-                fillPath.lineTo(x, y)
-            }
-        }
-        fillPath.lineTo(geometry.xForIndex(points.lastIndex), geometry.bottom)
-        fillPath.close()
+        buildRevealPath(geometry, closeToBottom = true, fillPath)
         fillPaint.shader = LinearGradient(
             0f,
             geometry.top,
@@ -256,27 +335,26 @@ class SimpleLineChartView @JvmOverloads constructor(
     }
 
     private fun drawLine(canvas: Canvas, geometry: ChartGeometry) {
-        linePath.reset()
-        points.forEachIndexed { index, point ->
-            val x = geometry.xForIndex(index)
-            val y = valueToY(point.value, geometry)
-            if (index == 0) linePath.moveTo(x, y) else linePath.lineTo(x, y)
-        }
+        buildRevealPath(geometry, closeToBottom = false, linePath)
         canvas.drawPath(linePath, linePaint)
     }
 
     private fun drawPoints(canvas: Canvas, geometry: ChartGeometry) {
+        val maxIndex = visibleEndIndex(revealProgress)
         val highlightIndex = selectedIndex
+
         points.forEachIndexed { index, point ->
+            if (index > maxIndex) return@forEachIndexed
             if (highlightIndex != null && index == highlightIndex) return@forEachIndexed
             val x = geometry.xForIndex(index)
             val y = valueToY(point.value, geometry)
             canvas.drawCircle(x, y, dp(3f), pointPaint)
         }
 
-        points.forEachIndexed { index, point ->
+        points.forEachIndexed { index, _ ->
+            if (index > maxIndex) return@forEachIndexed
             val x = geometry.xForIndex(index)
-            val label = point.dateLabel
+            val label = points[index].dateLabel
             val textWidth = labelPaint.measureText(label)
             canvas.drawText(
                 label,
@@ -350,16 +428,25 @@ class SimpleLineChartView @JvmOverloads constructor(
     }
 
     private fun computeGeometry(): ChartGeometry? {
-        val left = paddingLeft + dp(24f)
+        val left = paddingLeft + dp(28f)
         val right = width - paddingRight - dp(20f)
         val top = paddingTop + dp(52f)
         val bottom = height - paddingBottom - dp(22f)
         val chartHeight = bottom - top
         if (chartHeight <= 0f || right <= left) return null
 
+        val dataMin = points.minOf { it.value }
         val dataMax = points.maxOf { it.value }
-        val useNormalizedScale = dataMax == 0
-        val maxValue = if (useNormalizedScale) 1 else max(dataMax, 1)
+        var minValue = min(dataMin, 0)
+        var maxValue = max(dataMax, 0)
+        if (dataMin == 0 && dataMax == 0) {
+            minValue = -1
+            maxValue = 1
+        } else if (minValue == maxValue) {
+            if (maxValue >= 0) minValue -= 1 else maxValue += 1
+        }
+        val valueRange = (maxValue - minValue).toFloat().coerceAtLeast(1f)
+
         val stepX = if (points.size <= 1) 0f else (right - left) / (points.size - 1)
         return ChartGeometry(
             left = left,
@@ -368,11 +455,10 @@ class SimpleLineChartView @JvmOverloads constructor(
             bottom = bottom,
             chartHeight = chartHeight,
             stepX = stepX,
-            dataMax = dataMax,
+            minValue = minValue,
             maxValue = maxValue,
-            useNormalizedScale = useNormalizedScale,
-            scaleMax = maxValue.toFloat(),
-            gridDivisions = if (useNormalizedScale) 5 else 4,
+            valueRange = valueRange,
+            gridDivisions = 4,
         )
     }
 
@@ -383,20 +469,17 @@ class SimpleLineChartView @JvmOverloads constructor(
         val bottom: Float,
         val chartHeight: Float,
         val stepX: Float,
-        val dataMax: Int,
+        val minValue: Int,
         val maxValue: Int,
-        val useNormalizedScale: Boolean,
-        val scaleMax: Float,
+        val valueRange: Float,
         val gridDivisions: Int,
     ) {
         fun xForIndex(index: Int): Float = left + stepX * index
     }
 
     private fun valueToY(value: Int, geometry: ChartGeometry): Float {
-        if (value == 0) {
-            return geometry.bottom
-        }
-        return geometry.bottom - (value.toFloat() / geometry.scaleMax) * geometry.chartHeight
+        val ratio = (value - geometry.minValue) / geometry.valueRange
+        return geometry.bottom - ratio * geometry.chartHeight
     }
 
     private fun dp(value: Float): Float = value * resources.displayMetrics.density
@@ -407,5 +490,6 @@ class SimpleLineChartView @JvmOverloads constructor(
 
     companion object {
         private const val BUBBLE_DISMISS_MS = 3_000L
+        private const val REVEAL_DURATION_MS = 650L
     }
 }
