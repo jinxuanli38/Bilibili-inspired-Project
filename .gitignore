@@ -16,5 +16,6 @@ local.properties
 .idea/gradle.xml
 
 # GSY 源码备份目录（使用 Gradle implementation 依赖即可）
+.tmp/
 .gsy-tmp/
 .gsy-src/

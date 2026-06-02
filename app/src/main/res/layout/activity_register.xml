@@ -69,7 +69,8 @@
         android:textSize="16sp"
         android:autofillHints="emailAddress"
         android:imeOptions="actionNext"
-
+        android:maxLines="1"
+        android:singleLine="true"
         app:layout_constraintBaseline_toBaselineOf="@+id/tv_label_account"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/tv_label_account" />
@@ -104,7 +105,8 @@
         android:textSize="16sp"
         android:autofillHints="name"
         android:imeOptions="actionNext"
-
+        android:maxLines="1"
+        android:singleLine="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/tv_label_nickname"
         app:layout_constraintTop_toBottomOf="@+id/view_divider_1" />
@@ -138,9 +140,10 @@
         android:textColorHint="#CCCCCC"
         android:textSize="16sp"
         android:autofillHints="password"
-        android:imeOptions="actionNext|flagNoExtractUi"
+        android:imeOptions="actionNext"
+        android:maxLines="1"
         android:paddingEnd="8dp"
-
+        android:singleLine="true"
         app:layout_constraintEnd_toStartOf="@+id/btn_toggle_password"
         app:layout_constraintStart_toEndOf="@+id/tv_label_password"
         app:layout_constraintTop_toBottomOf="@+id/view_divider_nickname" />
@@ -187,9 +190,10 @@
         android:textColorHint="#CCCCCC"
         android:textSize="16sp"
         android:autofillHints="password"
-        android:imeOptions="actionNext|flagNoExtractUi"
+        android:imeOptions="actionNext"
+        android:maxLines="1"
         android:paddingEnd="8dp"
-
+        android:singleLine="true"
         app:layout_constraintEnd_toStartOf="@+id/btn_toggle_password_confirm"
         app:layout_constraintStart_toEndOf="@+id/tv_label_password_confirm"
         app:layout_constraintTop_toBottomOf="@+id/view_divider_2" />
@@ -233,11 +237,12 @@
         android:background="@null"
         android:hint="@string/input_verifyCode"
         android:imeOptions="actionDone"
-        android:inputType="numberSigned"
+        android:inputType="number"
         android:maxLength="8"
+        android:maxLines="1"
+        android:singleLine="true"
         android:textColorHint="#CCCCCC"
         android:textSize="16sp"
-
         app:layout_constraintEnd_toStartOf="@+id/iv_captcha_code"
         app:layout_constraintStart_toEndOf="@+id/tv_label_captcha"
         app:layout_constraintTop_toBottomOf="@+id/view_divider_password_confirm" />

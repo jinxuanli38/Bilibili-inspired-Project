@@ -161,6 +161,23 @@ class LoginActivity : AppCompatActivity() {
             }
             false
         }
+
+        binding.etCaptcha.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                hideKeyboard()
+                if (binding.btnLogin.isEnabled) {
+                    performLogin()
+                }
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.hideSoftInputFromWindow(binding.root.windowToken, 0)
     }
 
     private fun checkInputs(editTexts: List<EditText>) {
