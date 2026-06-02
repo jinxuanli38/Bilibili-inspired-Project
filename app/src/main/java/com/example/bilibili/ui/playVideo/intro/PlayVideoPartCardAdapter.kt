@@ -82,8 +82,10 @@ class PlayVideoPartCardAdapter(
         }
 
         fun stopPlayingAnimation() {
-            playingDrawable?.stop()
-            playingDrawable?.callback = null
+            playingDrawable?.let { drawable ->
+                drawable.stop()
+                drawable.callback = null // 【核心】：切断动画对 TextView 的强引用
+            }
             playingDrawable = null
         }
     }

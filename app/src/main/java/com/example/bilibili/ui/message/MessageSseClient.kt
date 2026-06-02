@@ -22,12 +22,16 @@ class MessageSseClient {
     private var call: Call? = null
 
     fun start(onEvent: (JSONObject) -> Unit) {
+        // 防内存泄漏
         stop()
+        // 身份校验
         val token = SPUtils.getToken()
         if (token.isEmpty()) return
+        // 网络请求包
         val request = Request.Builder()
             .url("${RetrofitClient.BASE_URL}message/sse/subscribe")
             .header("webToken", token)
+            // 订阅sse
             .header("Accept", "text/event-stream")
             .get()
             .build()

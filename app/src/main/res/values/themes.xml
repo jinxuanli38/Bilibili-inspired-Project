@@ -19,6 +19,7 @@
         <item name="colorSecondaryContainer">@android:color/transparent</item>
         <item name="colorPrimary">#FB7299</item>
         <item name="colorOnSurface">#757575</item>
+        <item name="colorControlHighlight">@color/bottom_nav_ripple</item>
     </style>
 
     <style name="BiliUploadItemStyle">

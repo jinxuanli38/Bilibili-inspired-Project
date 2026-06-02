@@ -11,8 +11,14 @@ import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.GridLayoutManager
 import com.example.bilibili.R
+import com.example.bilibili.ui.user.FollowStatsCenter
+import com.example.bilibili.util.SPUtils
+import kotlinx.coroutines.launch
 import com.example.bilibili.data.model.CreatorStatistics
 import com.example.bilibili.data.model.ServiceAction
 import com.example.bilibili.databinding.FragmentCreatorStatisticsBinding
@@ -59,10 +65,9 @@ class CreatorStatisticsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupInsets()
         setupRecyclerViews()
-        setupRefresh()
+        observeFansCountPush()
 
         viewModel.uiState.observe(viewLifecycleOwner) { state ->
-            binding.swipeRefresh.isRefreshing = false
             when (state) {
                 CreatorStatisticsViewModel.UiState.Loading -> showLoading()
                 CreatorStatisticsViewModel.UiState.NeedLogin -> showNeedLogin()
@@ -73,7 +78,11 @@ class CreatorStatisticsFragment : Fragment() {
 
         viewModel.chart.observe(viewLifecycleOwner) { chart ->
             binding.cardChart.tvChartTitle.text = chart.title
-            binding.cardChart.chartView.setData(chart.points, chart.metricLabel)
+            binding.cardChart.chartView.setData(
+                chart.points,
+                chart.metricLabel,
+                allowNegativeAxis = chart.dataType == FANS_DATA_TYPE,
+            )
             val allZero = chart.points.isNotEmpty() && chart.points.all { it.value == 0 }
             binding.cardChart.tvChartHint.isVisible = allZero && !chart.loadFailed
             if (chart.loadFailed) {
@@ -112,9 +121,25 @@ class CreatorStatisticsFragment : Fragment() {
         binding.rvServices.itemAnimator = null
     }
 
-    private fun setupRefresh() {
-        binding.swipeRefresh.setColorSchemeResources(R.color.bili_pink)
-        binding.swipeRefresh.setOnRefreshListener { viewModel.refresh() }
+    private fun observeFansCountPush() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                FollowStatsCenter.fansCountUpdates.collect { update ->
+                    if (update.userId == SPUtils.getUserId()) {
+                        viewModel.refresh(showLoading = false)
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (SPUtils.getToken().isNotEmpty() &&
+            viewModel.uiState.value is CreatorStatisticsViewModel.UiState.Success
+        ) {
+            viewModel.refresh(showLoading = false)
+        }
     }
 
     private fun showLoading() {
@@ -175,5 +200,10 @@ class CreatorStatisticsFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+    companion object {
+        /** 与后端 statistics_info dataType 一致：仅粉丝近 7 日净增允许负轴 */
+        private const val FANS_DATA_TYPE = 1
     }
 }

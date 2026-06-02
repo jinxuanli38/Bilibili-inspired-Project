@@ -42,12 +42,14 @@ class CreatorStatisticsViewModel : ViewModel() {
 
     private var cachedStats: CreatorStatistics? = null
 
-    fun refresh() {
+    fun refresh(showLoading: Boolean = true) {
         if (SPUtils.getToken().isEmpty()) {
             _uiState.value = UiState.NeedLogin
             return
         }
-        _uiState.value = UiState.Loading
+        if (showLoading) {
+            _uiState.value = UiState.Loading
+        }
         viewModelScope.launch {
             try {
                 val stats = withContext(Dispatchers.IO) { loadStatistics() }

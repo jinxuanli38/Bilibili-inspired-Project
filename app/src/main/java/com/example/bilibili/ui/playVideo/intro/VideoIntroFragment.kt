@@ -29,6 +29,7 @@ import com.example.bilibili.ui.user.UserProfileActivity
 import com.example.bilibili.util.DeviceIdHelper
 import com.example.bilibili.util.FollowActionButtonUi
 import com.example.bilibili.util.GlideEngine
+import com.example.bilibili.util.optNormalizedString
 import com.example.bilibili.util.fixHorizontalScrollConflictWithParent
 import com.example.bilibili.util.RetrofitClient
 import com.example.bilibili.util.SPUtils
@@ -178,6 +179,7 @@ class VideoIntroFragment : Fragment() {
             tvPostTime.text = info.optString("createTime")
 
             tvVideoId.text = "ID: $videoId"
+            bindPostStatement(info)
             tvVideoIntroduction.text = info.optString("introduction")
 
             cgTags.removeAllViews() // 刷新前先清空旧标签，防止页面滑动导致数据错乱叠加
@@ -236,6 +238,23 @@ class VideoIntroFragment : Fragment() {
             llFav.setOnClickListener {
                 sharedViewModel.doVideoAction(videoId, 3) { /* 状态由 userActionsLive / videoDetailLive 同步 */ }
             }
+        }
+    }
+
+    /** postType：0 原创，1 转载；转载展示 originInfo */
+    private fun bindPostStatement(info: JSONObject) {
+        val isRepost = info.optInt("postType", 0) == 1
+        if (isRepost) {
+            binding.ivPostStatement.setImageResource(R.drawable.ic_edit_box)
+            val source = info.optNormalizedString("originInfo")
+            binding.tvPostStatement.text = if (source.isNotEmpty()) {
+                getString(R.string.video_repost_source_format, source)
+            } else {
+                getString(R.string.video_repost_source_empty)
+            }
+        } else {
+            binding.ivPostStatement.setImageResource(R.drawable.ic_no_repost)
+            binding.tvPostStatement.text = getString(R.string.video_statement_no_repost)
         }
     }
 

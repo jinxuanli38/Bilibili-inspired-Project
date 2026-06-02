@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import org.json.JSONObject
 
 /**
@@ -42,7 +43,7 @@ object FollowStatsCenter {
 
     fun publishLocalChange(change: FollowChange) {
         _changes.tryEmit(change)
-        _relationVersion.value = _relationVersion.value + 1
+        _relationVersion.update { it + 1 }
     }
 
     fun applySsePayload(json: JSONObject) {

@@ -132,4 +132,7 @@
     <string name="message_comment_not_found">未找到对应评论，可能已被删除</string>
     <string name="message_badge_max">99+</string>
     <string name="message_follow_back_success">回关成功</string>
+    <string name="video_statement_no_repost">未经作者授权禁止转载</string>
+    <string name="video_repost_source_format">转载来源：%1$s</string>
+    <string name="video_repost_source_empty">转载来源未填写</string>
 </resources>

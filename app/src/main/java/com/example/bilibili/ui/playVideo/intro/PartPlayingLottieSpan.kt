@@ -46,9 +46,24 @@ object PartPlayingLottieSpan {
         title: String,
         composition: LottieComposition,
     ): LottieDrawable {
-        val iconSize = textView.textSize.toInt().coerceAtLeast(1)
+        val iconSize = (textView.textSize * 1.5f).toInt().coerceAtLeast(1)
         val drawable = createDrawable(textView.context, composition, iconSize)
-        drawable.callback = textView
+
+        // 【核心修改】：不要直接赋给 textView，而是用一个增强型的 Callback 代理它
+        drawable.callback = object : Drawable.Callback {
+            override fun invalidateDrawable(who: Drawable) {
+                // 当 Lottie 动画跳动到下一帧时，强行逼迫 TextView 重新绘制自己！
+                textView.invalidate()
+            }
+
+            override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
+                textView.postDelayed(what, `when` - android.os.SystemClock.uptimeMillis())
+            }
+
+            override fun unscheduleDrawable(who: Drawable, what: Runnable) {
+                textView.removeCallbacks(what)
+            }
+        }
 
         val content = "$ICON_PLACEHOLDER $title"
         val spannable = SpannableString(content)
@@ -87,7 +102,7 @@ object PartPlayingLottieSpan {
         }
     }
 
-  /** 让图标在单行内与文字垂直居中，换行后第二行从文字起始对齐。 */
+    /** 让图标在单行内与文字垂直居中，换行后第二行从文字起始对齐。 */
     private class CenteredImageSpan(drawable: Drawable) : ImageSpan(drawable, ALIGN_CENTER) {
         override fun getSize(
             paint: android.graphics.Paint,

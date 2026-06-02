@@ -43,6 +43,7 @@ import com.example.bilibili.ui.playVideo.intro.VideoIntroFragment
 import com.example.bilibili.util.GlideEngine
 import com.example.bilibili.util.ToastUtils
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.content.ContextCompat
 import com.example.bilibili.util.VideoDataUtils
 import com.example.bilibili.util.BilibiliBottomSheetDialog
 import com.google.android.material.tabs.TabLayout
@@ -433,6 +434,12 @@ class PlayVideoActivity : AppCompatActivity() {
     }
 
     private fun danmuSheetDialog() {
+        val wasPlayingBeforeDanmu =
+            binding.videoPlayer.currentState == GSYVideoView.CURRENT_STATE_PLAYING
+        if (wasPlayingBeforeDanmu) {
+            binding.videoPlayer.onVideoPause()
+        }
+
         val bottomSheetDialog = BilibiliBottomSheetDialog(this)
         val dialogBinding = DialogDanmuSettingBinding.inflate(layoutInflater)
         bottomSheetDialog.setContentView(dialogBinding.root)
@@ -540,11 +547,35 @@ class PlayVideoActivity : AppCompatActivity() {
             imm.hideSoftInputFromWindow(dialogBinding.etDanmuMessage.windowToken, 0)
 
             bottomSheetDialog.dismiss()
+            if (wasPlayingBeforeDanmu && !binding.videoPlayer.isEndScreenShowing) {
+                binding.videoPlayer.onVideoResume()
+            }
         }
 
         dialogBinding.etDanmuMessage.postDelayed({
             showInputMode()
         }, 200)
+
+        dialogBinding.root.viewTreeObserver.addOnGlobalLayoutListener {
+            val rect = android.graphics.Rect()
+            // 获取当前窗口可视区域的大小
+            dialogBinding.root.getWindowVisibleDisplayFrame(rect)
+            // 算出屏幕总高度和可视区域高度的差值
+            val screenHeight = dialogBinding.root.rootView.height
+            val keypadHeight = screenHeight - rect.bottom
+
+            // 如果差值大于屏幕高度的 15%，说明软键盘【弹出了】
+            if (keypadHeight > screenHeight * 0.15) {
+                // 软键盘出现 -> 设置为原色（比如透明或原本的灰色等，根据你原图来）
+                isStylePanelMode = false
+                dialogBinding.ivDanmuStyleBtn.clearColorFilter()
+            } else {
+                // 软键盘消失 -> 强行染成 B 站少女粉
+                isStylePanelMode = true
+                val pink = ContextCompat.getColor(this, R.color.bili_pink)
+                dialogBinding.ivDanmuStyleBtn.setColorFilter(pink, android.graphics.PorterDuff.Mode.SRC_IN)
+            }
+        }
 
         bottomSheetDialog.show()
     }

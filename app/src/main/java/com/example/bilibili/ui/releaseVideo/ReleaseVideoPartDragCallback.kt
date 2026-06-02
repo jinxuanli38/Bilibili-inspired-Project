@@ -20,20 +20,32 @@ class ReleaseVideoPartDragCallback(
         viewHolder: RecyclerView.ViewHolder,
         target: RecyclerView.ViewHolder,
     ): Boolean {
+        // 获取起末位置
         val from = viewHolder.bindingAdapterPosition
         val to = target.bindingAdapterPosition
+        // 确保位置真实存在
         if (from == RecyclerView.NO_POSITION || to == RecyclerView.NO_POSITION) {
             return false
         }
+        // 移动位置
         adapter.moveItem(from, to)
         onMoveSuccess(from, to)
         return true
     }
 
+    /**
+     * 禁用了侧滑删除
+     */
     override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) = Unit
 
+    /**
+     * 长按触发拖拽效果
+     */
     override fun isLongPressDragEnabled(): Boolean = true
 
+    /**
+     * 自动计算滑动速度
+     */
     override fun interpolateOutOfBoundsScroll(
         recyclerView: RecyclerView,
         viewSize: Int,
@@ -46,7 +58,11 @@ class ReleaseVideoPartDragCallback(
         return direction * speed
     }
 
+    /**
+     * 选中状态监听
+     */
     override fun onSelectedChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
+        // 查看拖拽状态
         if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
             val recyclerView = viewHolder?.itemView?.parent as? RecyclerView
             if (recyclerView != null && cachedItemAnimator == null) {
@@ -61,6 +77,9 @@ class ReleaseVideoPartDragCallback(
         super.onSelectedChanged(viewHolder, actionState)
     }
 
+    /**
+     * 拖拽收尾清理
+     */
     override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
         val droppedPos = viewHolder.bindingAdapterPosition
         adapter.exitDragMode()

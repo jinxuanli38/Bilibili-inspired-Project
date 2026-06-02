@@ -13,6 +13,7 @@ interface PostService {
         @Field("pCategoryId") pCategoryId: Int,
         @Field("categoryId") categoryId: Int?,
         @Field("postType") postType: Int,
+        @Field("originInfo") originInfo: String? = null,
         @Field("tags") tags: String,
         @Field("introduction") introduction: String?,
         @Field("interaction") interaction: String?,

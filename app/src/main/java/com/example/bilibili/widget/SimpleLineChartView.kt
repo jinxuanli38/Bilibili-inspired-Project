@@ -99,6 +99,8 @@ class SimpleLineChartView @JvmOverloads constructor(
 
     private var points: List<ChartPoint> = emptyList()
     private var valueLabel: String = ""
+    /** 仅粉丝近 7 日净增可为负；收藏等指标 Y 轴从 0 起 */
+    private var allowNegativeAxis = true
     private var selectedIndex: Int? = null
     private var revealProgress = 1f
     private var revealAnimator: ValueAnimator? = null
@@ -116,11 +118,17 @@ class SimpleLineChartView @JvmOverloads constructor(
     private var touchDownY = 0f
     private var isHorizontalDrag = false
 
-    fun setData(data: List<ChartPoint>, metricLabel: String = "", animate: Boolean = true) {
+    fun setData(
+        data: List<ChartPoint>,
+        metricLabel: String = "",
+        animate: Boolean = true,
+        allowNegativeAxis: Boolean = true,
+    ) {
         revealAnimator?.cancel()
         removeCallbacks(dismissHighlightRunnable)
         points = data
         valueLabel = metricLabel
+        this.allowNegativeAxis = allowNegativeAxis
         selectedIndex = null
         if (animate && data.isNotEmpty()) {
             revealProgress = 0f
@@ -437,13 +445,25 @@ class SimpleLineChartView @JvmOverloads constructor(
 
         val dataMin = points.minOf { it.value }
         val dataMax = points.maxOf { it.value }
-        var minValue = min(dataMin, 0)
-        var maxValue = max(dataMax, 0)
-        if (dataMin == 0 && dataMax == 0) {
-            minValue = -1
-            maxValue = 1
-        } else if (minValue == maxValue) {
-            if (maxValue >= 0) minValue -= 1 else maxValue += 1
+        var minValue: Int
+        var maxValue: Int
+        if (allowNegativeAxis) {
+            minValue = min(dataMin, 0)
+            maxValue = max(dataMax, 0)
+            if (dataMin == 0 && dataMax == 0) {
+                minValue = -1
+                maxValue = 1
+            } else if (minValue == maxValue) {
+                if (maxValue >= 0) minValue -= 1 else maxValue += 1
+            }
+        } else {
+            minValue = max(0, dataMin)
+            maxValue = max(0, dataMax)
+            if (minValue == 0 && maxValue == 0) {
+                maxValue = 1
+            } else if (minValue == maxValue) {
+                maxValue += 1
+            }
         }
         val valueRange = (maxValue - minValue).toFloat().coerceAtLeast(1f)
 

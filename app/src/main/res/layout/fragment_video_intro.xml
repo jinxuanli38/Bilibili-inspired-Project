@@ -184,6 +184,7 @@
                     android:textSize="12sp" />
 
                 <ImageView
+                    android:id="@+id/iv_post_statement"
                     android:layout_width="14dp"
                     android:layout_height="14dp"
                     android:layout_marginStart="12dp"
@@ -191,10 +192,14 @@
                     app:tint="#999999" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:id="@+id/tv_post_statement"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
-                    android:text="未经作者授权禁止转载"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:text="@string/video_statement_no_repost"
                     android:textColor="#999999"
                     android:textSize="12sp" />
             </LinearLayout>

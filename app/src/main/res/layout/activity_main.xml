@@ -33,10 +33,11 @@
             android:layout_height="60dp"
             android:background="@color/white"
             app:elevation="8dp"
+            app:itemBackground="@drawable/bg_bottom_nav_item_ripple"
             app:itemIconTint="@null"
+            app:itemRippleColor="@color/bottom_nav_ripple"
             app:itemTextColor="@color/nav_item_text_color"
             app:labelVisibilityMode="labeled"
-
             app:layout_constraintBottom_toBottomOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 

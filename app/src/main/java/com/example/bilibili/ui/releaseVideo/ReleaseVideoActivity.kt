@@ -101,8 +101,10 @@ class ReleaseVideoActivity : AppCompatActivity() {
         binding = ActivityReleaseVideoBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // 返回按钮
         binding.btnBack.setOnClickListener { requestExitPage() }
 
+        // 触屏返回
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 requestExitPage()
@@ -284,6 +286,7 @@ class ReleaseVideoActivity : AppCompatActivity() {
     }
 
     private fun setupVideoPartsList() {
+        // 分片属性
         partAdapter = ReleaseVideoPartAdapter(
             onPartSelected = { part -> viewModel.selectPart(part.id) },
             onMoreClick = { part, anchor ->
@@ -291,6 +294,7 @@ class ReleaseVideoActivity : AppCompatActivity() {
                 showPartMenu(part, anchor)
             },
         )
+        // 分片拖拽
         partItemTouchHelper = ItemTouchHelper(
             ReleaseVideoPartDragCallback(
                 partAdapter,
@@ -304,6 +308,7 @@ class ReleaseVideoActivity : AppCompatActivity() {
                 },
             ),
         )
+
         binding.rvVideoParts.layoutManager =
             LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.rvVideoParts.adapter = partAdapter
@@ -367,6 +372,9 @@ class ReleaseVideoActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 滚动到指定位置
+     */
     private fun scrollToPartIfNeeded(position: Int) {
         if (position == RecyclerView.NO_POSITION) return
         binding.rvVideoParts.post {

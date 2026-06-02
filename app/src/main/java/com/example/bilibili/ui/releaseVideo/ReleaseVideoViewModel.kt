@@ -500,6 +500,11 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
                     pCategoryId = pCategoryId,
                     categoryId = subCategoryId,
                     postType = if (statementType.value == StatementType.ORIGINAL) 0 else 1,
+                    originInfo = if (statementType.value == StatementType.REPOST) {
+                        repostSource.value?.trim().orEmpty().ifEmpty { null }
+                    } else {
+                        null
+                    },
                     tags = tags.joinToString(","),
                     introduction = introduction.value ?: "",
                     interaction = "",
@@ -533,6 +538,9 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
         videoParts.value?.firstOrNull()?.let { startUploadForPart(it.id) }
     }
 
+    /**
+     * 上传分p
+     */
     fun startUploadForPart(partId: String) {
         val part = currentParts().find { it.id == partId } ?: return
         if (part.filePath.isBlank()) {
@@ -552,6 +560,7 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
                     failPartUpload(partId, "视频文件不存在")
                     return@launch
                 }
+                // 切片
                 val totalBytes = file.length().coerceAtLeast(1L)
                 val targetChunks = 12L
                 val minChunkSize = 256 * 1024L

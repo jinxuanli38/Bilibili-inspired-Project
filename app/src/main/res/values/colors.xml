@@ -11,6 +11,8 @@
     <color name="grey">#757575</color>
     <color name="shallow_grey">#F5F5F5</color>
     <color name="bili_pink">#FB7299</color>
+    <!-- 底部导航按下波纹（约 20% 透明粉） -->
+    <color name="bottom_nav_ripple">#33FB7299</color>
     <color name="bilibili_pink">#FB7299</color>
     <color name="splash_background">#FFFFFF</color>
     <color name="bili_text_grey">#999999</color>
