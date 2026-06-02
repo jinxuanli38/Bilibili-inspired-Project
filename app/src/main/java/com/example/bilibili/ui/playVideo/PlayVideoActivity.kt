@@ -65,6 +65,9 @@ class PlayVideoActivity : AppCompatActivity() {
 
     private var currentVideoId: String = ""
 
+    /** 用户当前选中的视频（切换时立即更新，用于丢弃过期 LiveData / 开播） */
+    private var targetVideoId: String = ""
+
     /** 播放量延迟刷新任务；Activity 销毁时由 lifecycleScope 自动取消 */
     private var playCountRefreshJob: Job? = null
 
@@ -150,6 +153,8 @@ class PlayVideoActivity : AppCompatActivity() {
         // 4. 获取 Intent 数据并触发加载
         val videoId = intent.getStringExtra(EXTRA_VIDEO_ID) ?: ""
         if (videoId.isNotEmpty()) {
+            targetVideoId = videoId
+            currentVideoId = videoId
             if (intent.getBooleanExtra(EXTRA_OPEN_COMMENT_TAB, false)) {
                 viewModel.setPendingCommentAnchor(
                     CommentAnchor(
@@ -433,10 +438,23 @@ class PlayVideoActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 打开弹幕框前是否在播（含 HLS 缓冲态）。
+     * 用户已手动暂停则为 false，关框/发送后不再自动续播。
+     */
+    private fun isVideoActivelyPlaying(): Boolean =
+        binding.videoPlayer.currentState == GSYVideoView.CURRENT_STATE_PLAYING ||
+            binding.videoPlayer.currentState == GSYVideoView.CURRENT_STATE_PLAYING_BUFFERING_START
+
+    private fun resumeVideoAfterDanmuDialogIfNeeded(wasPlayingBeforeDialog: Boolean) {
+        if (wasPlayingBeforeDialog && !binding.videoPlayer.isEndScreenShowing) {
+            binding.videoPlayer.onVideoResume()
+        }
+    }
+
     private fun danmuSheetDialog() {
-        val wasPlayingBeforeDanmu =
-            binding.videoPlayer.currentState == GSYVideoView.CURRENT_STATE_PLAYING
-        if (wasPlayingBeforeDanmu) {
+        val wasPlayingBeforeDialog = isVideoActivelyPlaying()
+        if (wasPlayingBeforeDialog) {
             binding.videoPlayer.onVideoPause()
         }
 
@@ -545,11 +563,11 @@ class PlayVideoActivity : AppCompatActivity() {
             viewModel.sendDanmu(entity)
 
             imm.hideSoftInputFromWindow(dialogBinding.etDanmuMessage.windowToken, 0)
-
             bottomSheetDialog.dismiss()
-            if (wasPlayingBeforeDanmu && !binding.videoPlayer.isEndScreenShowing) {
-                binding.videoPlayer.onVideoResume()
-            }
+        }
+
+        bottomSheetDialog.setOnDismissListener {
+            resumeVideoAfterDanmuDialogIfNeeded(wasPlayingBeforeDialog)
         }
 
         dialogBinding.etDanmuMessage.postDelayed({
@@ -588,6 +606,7 @@ class PlayVideoActivity : AppCompatActivity() {
         // 观察播放地址：一旦拿到 M3U8 地址，立刻初始化 GSYPlayer
         viewModel.videoUrlLive.observe(this) { url ->
             if (url.isNullOrEmpty()) return@observe
+            if (!viewModel.isActiveVideoLoad(targetVideoId)) return@observe
             val sameUrl = url == currentVideoUrl
             currentVideoUrl = url
             currentVideoTitle = "视频播放"
@@ -616,7 +635,10 @@ class PlayVideoActivity : AppCompatActivity() {
 
         // 观察视频详情
         viewModel.videoDetailLive.observe(this) { videoInfo ->
-            currentVideoId = videoInfo.optString("videoId")
+            val id = videoInfo.optString("videoId")
+            if (id == targetVideoId) {
+                currentVideoId = id
+            }
         }
 
         viewModel.fileIdLive.observe(this) { fileId ->
@@ -632,6 +654,7 @@ class PlayVideoActivity : AppCompatActivity() {
 
         // 观察弹幕数据：先缓存，与播放地址都就绪后再灌入播放器并开播
         viewModel.danmuListLive.observe(this) { danmuEntities ->
+            if (!viewModel.isActiveVideoLoad(targetVideoId)) return@observe
             cachedDanmakuList = danmuEntities
             danmakuListReady = true
             tryStartPlayerWhenReady()
@@ -639,6 +662,7 @@ class PlayVideoActivity : AppCompatActivity() {
 
         // 观察雪碧图数据
         viewModel.previewConfigLive.observe(this) { config ->
+            if (!viewModel.isActiveVideoLoad(targetVideoId)) return@observe
             if (config != null && config.url.isNotEmpty()) {
                 this.currentPreviewConfig = config
                 loadPreviewSprite(config.url)
@@ -783,6 +807,7 @@ class PlayVideoActivity : AppCompatActivity() {
      * 先prepare准备弹幕然后再开播。
      */
     private fun tryStartPlayerWhenReady() {
+        if (!viewModel.isActiveVideoLoad(targetVideoId)) return
         val url = pendingPlayUrl ?: return
         if (!danmakuListReady) return
         val list = cachedDanmakuList ?: return
@@ -812,10 +837,11 @@ class PlayVideoActivity : AppCompatActivity() {
         // 释放后需等 Surface 重建再开播，否则易出现 BufferQueue abandoned
         binding.videoPlayer.postDelayed({
             if (isFinishing || isDestroyed) return@postDelayed
+            if (!viewModel.isActiveVideoLoad(targetVideoId)) return@postDelayed
             binding.videoPlayer.startPlayLogic()
             if (seekMs > 0) {
                 binding.videoPlayer.postDelayed({
-                    if (!isFinishing && !isDestroyed) {
+                    if (!isFinishing && !isDestroyed && viewModel.isActiveVideoLoad(targetVideoId)) {
                         binding.videoPlayer.seekTo(seekMs)
                     }
                 }, 300)
@@ -846,7 +872,7 @@ class PlayVideoActivity : AppCompatActivity() {
      * 从简介/结束页推荐切换视频：不新开 Activity，避免 GSY 与 Surface 被顶掉导致黑屏。
      */
     fun openRecommendVideo(videoId: String) {
-        if (videoId.isBlank() || videoId == currentVideoId) return
+        if (videoId.isBlank() || videoId == targetVideoId) return
         snapshotPlaybackState()
         if (currentVideoId.isNotEmpty()) {
             videoBackStack.addLast(
@@ -872,6 +898,8 @@ class PlayVideoActivity : AppCompatActivity() {
     }
 
     private fun switchToVideo(videoId: String, restorePositionMs: Long) {
+        targetVideoId = videoId
+        currentVideoId = videoId
         lastPlayPositionMs = restorePositionMs
         shouldRestorePlayback = false
         currentVideoUrl = null

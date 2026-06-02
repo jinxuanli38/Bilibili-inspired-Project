@@ -17,7 +17,9 @@ import com.example.bilibili.data.model.PreviewConfigEntity
 import com.example.bilibili.ui.playVideo.intro.RecommendVideoItem
 import com.example.bilibili.util.RetrofitClient
 import com.google.gson.Gson
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
@@ -100,13 +102,25 @@ class PlayVideoViewModel : ViewModel() {
     /** 推荐视频列表（简介页与播放结束页共用） */
     val recommendListLive = MutableLiveData<List<RecommendVideoItem>>()
 
-    fun loadRecommendVideos(videoName: String, videoId: String) {
+    private var loadVideoJob: Job? = null
+    private var videoLoadGeneration = 0
+
+    /** 当前有效的一次视频加载目标（与 generation 对应） */
+    @Volatile
+    var activeVideoId: String = ""
+        private set
+
+    fun isActiveVideoLoad(videoId: String): Boolean =
+        videoId.isNotBlank() && videoId == activeVideoId
+
+    fun loadRecommendVideos(videoName: String, videoId: String, loadGeneration: Int = videoLoadGeneration) {
         if (videoId.isBlank()) return
         viewModelScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
                     videoService.getVideoRecommend(videoName, videoId)
                 }
+                if (loadGeneration != videoLoadGeneration) return@launch
                 val jsonObject = JSONObject(response)
                 if (jsonObject.optString("status") != "success") return@launch
 
@@ -144,10 +158,15 @@ class PlayVideoViewModel : ViewModel() {
                         }
                     }
                 }.awaitAll()
+                if (loadGeneration != videoLoadGeneration) return@launch
                 recommendListLive.postValue(enrichedList)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 e.printStackTrace()
-                recommendListLive.postValue(emptyList())
+                if (loadGeneration == videoLoadGeneration) {
+                    recommendListLive.postValue(emptyList())
+                }
             }
         }
     }
@@ -211,15 +230,28 @@ class PlayVideoViewModel : ViewModel() {
     }
 
     private fun loadDanmuForPart(fileId: String, videoId: String) {
+        val generation = videoLoadGeneration
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val danmuRes = danmuService.loadDanmu(fileId, videoId)
+                if (generation != videoLoadGeneration) return@launch
                 danmuListLive.postValue(parseDanmuList(danmuRes))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 e.printStackTrace()
-                danmuListLive.postValue(emptyList())
+                if (generation == videoLoadGeneration) {
+                    danmuListLive.postValue(emptyList())
+                }
             }
         }
+    }
+
+    private suspend fun loadDanmuForPartSync(fileId: String, videoId: String): List<DanmuEntity> {
+        val danmuRes = withContext(Dispatchers.IO) {
+            danmuService.loadDanmu(fileId, videoId)
+        }
+        return parseDanmuList(danmuRes)
     }
 
     /**
@@ -283,62 +315,106 @@ class PlayVideoViewModel : ViewModel() {
     }
 
     fun fetchAllData(videoId: String) {
+        if (videoId.isBlank()) return
+        loadVideoJob?.cancel()
+        val generation = ++videoLoadGeneration
+        activeVideoId = videoId
         commentOrderType = 0
-        viewModelScope.launch {
+
+        loadVideoJob = viewModelScope.launch {
+            fun isStale(): Boolean = generation != videoLoadGeneration
             try {
-                // 并发请求：视频详情 + 分P列表
                 val (infoRes, pListRes) = withContext(Dispatchers.IO) {
                     val info = videoService.getVideoInfo(videoId)
                     val pList = videoService.loadVideoPList(videoId)
                     Pair(info, pList)
                 }
-                fetchComments(videoId)
+                if (isStale()) return@launch
+
+                loadCommentsForVideo(videoId, generation)
+                if (isStale()) return@launch
 
                 val root = JSONObject(infoRes)
-                if (root.optInt("code") == 200) {
-                    val data = root.getJSONObject("data")
-                    val videoInfo = data.getJSONObject("videoInfo")
-
-                    // 发布视频详情数据和用户行为列表
-                    videoDetailLive.postValue(videoInfo)
-                    userActionsLive.postValue(data.optJSONArray("userActionList"))
-                    loadRecommendVideos(
-                        videoInfo.optString("videoName"),
-                        videoInfo.optString("videoId")
-                    )
-
-                    // 拿到 userId 去请求作者信息
-                    val userId = videoInfo.getString("userId")
-                    val uRes = withContext(Dispatchers.IO) { postService.getUserInfo(userId) }
-                    val userData = JSONObject(uRes).getJSONObject("data")
-
-                    authorLive.postValue(userData)
-                    val haveFocus = userData.optBoolean("haveFocus")
-                    isFollowedLive.postValue(haveFocus)
-                    focusTypeLive.postValue(
-                        if (userData.has("focusType")) {
-                            userData.optInt("focusType", 0)
-                        } else if (haveFocus) {
-                            2
-                        } else {
-                            0
-                        },
-                    )
-
-                    val parts = parseVideoParts(pListRes)
-                    videoPartListLive.postValue(parts)
-                    if (parts.isNotEmpty()) {
-                        val first = parts.first()
-                        currentPartFileIdLive.postValue(first.fileId)
-                        fileIdLive.postValue(first.fileId)
-                        videoUrlLive.postValue(buildVideoUrl(first.fileId))
-                        loadDanmuForPart(first.fileId, videoId)
-                        loadPreviewForPart(first.fileId, first.duration)
-                    }
+                if (root.optInt("code") != 200) {
+                    if (!isStale()) errorLive.postValue("获取数据失败")
+                    return@launch
                 }
+                val data = root.getJSONObject("data")
+                val videoInfo = data.getJSONObject("videoInfo")
+
+                videoDetailLive.postValue(videoInfo)
+                userActionsLive.postValue(data.optJSONArray("userActionList"))
+
+                val userId = videoInfo.getString("userId")
+                val uRes = withContext(Dispatchers.IO) { postService.getUserInfo(userId) }
+                if (isStale()) return@launch
+                val userData = JSONObject(uRes).getJSONObject("data")
+
+                authorLive.postValue(userData)
+                val haveFocus = userData.optBoolean("haveFocus")
+                isFollowedLive.postValue(haveFocus)
+                focusTypeLive.postValue(
+                    if (userData.has("focusType")) {
+                        userData.optInt("focusType", 0)
+                    } else if (haveFocus) {
+                        2
+                    } else {
+                        0
+                    },
+                )
+
+                val parts = parseVideoParts(pListRes)
+                videoPartListLive.postValue(parts)
+                if (parts.isNotEmpty()) {
+                    val first = parts.first()
+                    val danmuList = loadDanmuForPartSync(first.fileId, videoId)
+                    if (isStale()) return@launch
+                    currentPartFileIdLive.postValue(first.fileId)
+                    fileIdLive.postValue(first.fileId)
+                    videoUrlLive.postValue(buildVideoUrl(first.fileId))
+                    danmuListLive.postValue(danmuList)
+                    previewConfigLive.postValue(buildPreviewConfig(first.fileId, first.duration))
+                }
+
+                loadRecommendVideos(
+                    videoInfo.optString("videoName"),
+                    videoInfo.optString("videoId"),
+                    generation,
+                )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 e.printStackTrace()
-                errorLive.postValue("获取数据失败")
+                if (!isStale()) errorLive.postValue("获取数据失败")
+            }
+        }
+    }
+
+    private suspend fun loadCommentsForVideo(videoId: String, generation: Int) {
+        if (generation != videoLoadGeneration) return
+        try {
+            val jsonString = withContext(Dispatchers.IO) {
+                commentService.loadComment(videoId, 1, commentOrderType)
+            }
+            if (generation != videoLoadGeneration) return
+
+            val root = JSONObject(jsonString)
+            val dataObj = root.optJSONObject("data") ?: return
+
+            val container = Gson().fromJson(dataObj.toString(), CommentDataContainer::class.java)
+            val allComments = container.commentData.list ?: emptyList()
+            val userActions = container.userActionList ?: emptyList()
+
+            commentTotalCount.postValue(container.commentData.totalCount)
+            val actionMap = userActions.associateBy({ it.commentId }, { it.actionType })
+            allComments.forEach { applyUserActionsRecursively(it, actionMap) }
+            commentListLive.postValue(allComments)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            e.printStackTrace()
+            if (generation == videoLoadGeneration) {
+                errorLive.postValue("加载评论失败: ${e.message}")
             }
         }
     }
