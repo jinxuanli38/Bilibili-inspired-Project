@@ -67,7 +67,12 @@
         app:layout_constraintStart_toEndOf="@id/iv_avatar"
         app:layout_constraintTop_toBottomOf="@id/iv_banner">
 
-        <LinearLayout style="@style/UserStatItemStyle">
+        <LinearLayout
+            android:id="@+id/layout_fans_stat"
+            style="@style/UserStatItemStyle"
+            android:clickable="true"
+            android:focusable="true">
+
             <TextView
                 android:id="@+id/tv_fans_count"
                 style="@style/UserStatNumberStyle"
@@ -83,7 +88,12 @@
             android:layout_height="14dp"
             android:background="#EEEEEE" />
 
-        <LinearLayout style="@style/UserStatItemStyle">
+        <LinearLayout
+            android:id="@+id/layout_follow_stat"
+            style="@style/UserStatItemStyle"
+            android:clickable="true"
+            android:focusable="true">
+
             <TextView
                 android:id="@+id/tv_follow_count"
                 style="@style/UserStatNumberStyle"
@@ -99,7 +109,12 @@
             android:layout_height="14dp"
             android:background="#EEEEEE" />
 
-        <LinearLayout style="@style/UserStatItemStyle">
+        <LinearLayout
+            android:id="@+id/layout_like_stat"
+            style="@style/UserStatItemStyle"
+            android:clickable="true"
+            android:focusable="true">
+
             <TextView
                 android:id="@+id/tv_like_count"
                 style="@style/UserStatNumberStyle"

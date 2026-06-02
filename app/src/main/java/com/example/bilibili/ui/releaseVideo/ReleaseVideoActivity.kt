@@ -16,6 +16,7 @@ import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import androidx.activity.enableEdgeToEdge
@@ -164,8 +165,9 @@ class ReleaseVideoActivity : AppCompatActivity() {
 
         // 监听简介点击事件
         binding.introduction.setOnClickListener {
-            val introductionSheet = IntroductionBottomSheetDialogFragment()
-            introductionSheet.show(supportFragmentManager, "Introduction")
+            clearTitleFocusAndHideKeyboard()
+            IntroductionBottomSheetDialogFragment()
+                .show(supportFragmentManager, "Introduction")
         }
 
         binding.btnPublish.setOnClickListener {
@@ -251,6 +253,7 @@ class ReleaseVideoActivity : AppCompatActivity() {
             if (loaded != true) return@observe
             applyEditModeUi()
             binding.etTitle.setText(viewModel.videoTitle.value.orEmpty())
+            binding.etTitle.clearFocus()
             binding.titleLength.text = "${binding.etTitle.text.length}/80"
             val cover = viewModel.videoCoverUrl.value
             if (!cover.isNullOrBlank() && cover != "default_cover.jpg") {
@@ -321,6 +324,15 @@ class ReleaseVideoActivity : AppCompatActivity() {
         }
         partItemTouchHelper.attachToRecyclerView(binding.rvVideoParts)
         binding.rvVideoParts.fixHorizontalScrollConflictWithParent()
+    }
+
+    private fun clearTitleFocusAndHideKeyboard() {
+        binding.etTitle.clearFocus()
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        currentFocus?.let { imm.hideSoftInputFromWindow(it.windowToken, 0) }
+        imm.hideSoftInputFromWindow(binding.etTitle.windowToken, 0)
+        binding.root.isFocusableInTouchMode = true
+        binding.root.requestFocus()
     }
 
     private fun refreshUploadUi() {

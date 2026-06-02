@@ -36,6 +36,9 @@
     <string name="default_personal_intro">这个家伙很懒，什么也没留下</string>
     <string name="default_school">门头沟学院</string>
     <string name="profile_birthday_unset">未设置</string>
+    <string name="profile_other_user_fans_unavailable">暂不支持查看他人粉丝信息</string>
+    <string name="profile_other_user_follow_unavailable">暂不支持查看他人关注信息</string>
+    <string name="profile_other_user_like_unavailable">暂不支持查看他人获赞信息</string>
     <string name="publish">发布</string>
     <string name="publish_protocol">我已阅读并接受《避风港社区公约》</string>
     <string name="search_bar_hint">搜索视频</string>

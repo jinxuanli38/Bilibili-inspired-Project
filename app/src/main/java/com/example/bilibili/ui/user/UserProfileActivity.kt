@@ -20,6 +20,7 @@ import com.example.bilibili.R
 import com.example.bilibili.data.api.PostService
 import com.example.bilibili.databinding.ActivityUserProfileBinding
 import com.example.bilibili.ui.edit.EditActivity
+import com.example.bilibili.ui.friends.MyFriendsActivity
 import com.example.bilibili.ui.message.RealtimeSseClient
 import com.example.bilibili.ui.user.FollowStatsCenter
 import com.example.bilibili.ui.personal.contribute.ContributeFragment
@@ -81,6 +82,8 @@ class UserProfileActivity : AppCompatActivity() {
         // 关注 / 编辑资料按钮
         setupProfileActionButton()
 
+        setupStatsClickListeners()
+
         // 加载用户信息
         loadUserInfo()
 
@@ -108,6 +111,47 @@ class UserProfileActivity : AppCompatActivity() {
     private fun isCurrentUser(): Boolean {
         val currentUserId = SPUtils.getUserId()
         return currentUserId.isNotEmpty() && targetUserId == currentUserId
+    }
+
+    private fun setupStatsClickListeners() {
+        binding.layoutFansStat.setOnClickListener {
+            if (isCurrentUser()) {
+                MyFriendsActivity.start(this, MyFriendsActivity.TAB_FANS)
+            } else {
+                ToastUtils.showShort(this, getString(R.string.profile_other_user_fans_unavailable))
+            }
+        }
+        binding.layoutFollowStat.setOnClickListener {
+            if (isCurrentUser()) {
+                MyFriendsActivity.start(this, MyFriendsActivity.TAB_FOLLOWING)
+            } else {
+                ToastUtils.showShort(this, getString(R.string.profile_other_user_follow_unavailable))
+            }
+        }
+        binding.layoutLikeStat.setOnClickListener {
+            if (isCurrentUser()) {
+                showLikeSummaryDialog()
+            } else {
+                ToastUtils.showShort(this, getString(R.string.profile_other_user_like_unavailable))
+            }
+        }
+    }
+
+    private fun showLikeSummaryDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_like_summary, null)
+        dialogView.findViewById<android.widget.TextView>(R.id.tv_nickname).text =
+            binding.tvNickname.text
+        dialogView.findViewById<android.widget.TextView>(R.id.tv_like_count).text =
+            binding.tvLikeCount.text
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialogView.findViewById<View>(R.id.btn_confirm).setOnClickListener {
+            dialog.dismiss()
+        }
+        dialog.show()
     }
 
     private fun setupProfileActionButton() {

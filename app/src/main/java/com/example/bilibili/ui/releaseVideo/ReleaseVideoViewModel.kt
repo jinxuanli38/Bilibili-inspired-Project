@@ -17,6 +17,8 @@ import com.example.bilibili.data.model.CategoryInfo
 import com.example.bilibili.data.model.ReleaseVideoPart
 import com.example.bilibili.util.ApiResponseHelper
 import com.example.bilibili.util.RetrofitClient
+import com.example.bilibili.util.UserInfoText
+import com.example.bilibili.util.optNormalizedString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -159,7 +161,7 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun setIntroduction(text: String) {
-        introduction.value = text
+        introduction.value = UserInfoText.normalize(text)
     }
 
     fun setStatementType(type: StatementType) {
@@ -167,7 +169,7 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun setRepostSource(source: String) {
-        repostSource.value = source
+        repostSource.value = UserInfoText.normalize(source)
     }
 
     fun setVideoTitle(title: String) {
@@ -221,9 +223,9 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
                 val fileArray = data.optJSONArray("videoInfoFileList") ?: JSONArray()
                 editingVideoStatus = videoInfo.optInt("status", -1).takeIf { it >= 0 }
 
-                videoTitle.postValue(videoInfo.optString("videoName"))
-                videoCoverUrl.postValue(videoInfo.optString("videoCover"))
-                introduction.postValue(videoInfo.optString("introduction"))
+                videoTitle.postValue(videoInfo.optNormalizedString("videoName"))
+                videoCoverUrl.postValue(videoInfo.optNormalizedString("videoCover"))
+                introduction.postValue(videoInfo.optNormalizedString("introduction"))
 
                 val tagList = videoInfo.optString("tags")
                     .split(",")
@@ -236,7 +238,7 @@ class ReleaseVideoViewModel(application: Application) : AndroidViewModel(applica
                 statementType.postValue(
                     if (postType == 1) StatementType.REPOST else StatementType.ORIGINAL,
                 )
-                repostSource.postValue(videoInfo.optString("originInfo"))
+                repostSource.postValue(videoInfo.optNormalizedString("originInfo"))
 
                 val (pCategoryId, categoryId) = readCategoryIdsForEdit(videoId, videoInfo)
                 applyPartitionForEdit(pCategoryId, categoryId)

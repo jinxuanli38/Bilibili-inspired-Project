@@ -14,6 +14,7 @@ import com.example.bilibili.databinding.LayoutBottomSheetAuthorStatementBinding
 import com.example.bilibili.ui.releaseVideo.ReleaseVideoViewModel
 import com.example.bilibili.util.TextSelectHandleHelper
 import com.example.bilibili.util.ToastUtils
+import com.example.bilibili.util.UserInfoText
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 
 class AuthorStatementBottomSheetDialogFragment : BottomSheetDialogFragment() {
@@ -59,14 +60,22 @@ class AuthorStatementBottomSheetDialogFragment : BottomSheetDialogFragment() {
         // 从 ViewModel 获取当前选择的状态
         val currentType = viewModel.statementType.value ?: ReleaseVideoViewModel.StatementType.ORIGINAL
         when (currentType) {
-            ReleaseVideoViewModel.StatementType.ORIGINAL -> binding.rbOriginal.isChecked = true
-            ReleaseVideoViewModel.StatementType.REPOST -> binding.rbRepost.isChecked = true
+            ReleaseVideoViewModel.StatementType.ORIGINAL -> {
+                binding.rbOriginal.isChecked = true
+                binding.layoutRepostInput.visibility = View.GONE
+            }
+            ReleaseVideoViewModel.StatementType.REPOST -> {
+                binding.rbRepost.isChecked = true
+                binding.layoutRepostInput.visibility = View.VISIBLE
+            }
         }
     }
 
     private fun setupSourceInput() {
-        // 从 ViewModel 获取当前的转载来源
-        val currentSource = viewModel.repostSource.value ?: ""
+        val currentSource = UserInfoText.normalize(viewModel.repostSource.value)
+        if (currentSource != viewModel.repostSource.value) {
+            viewModel.setRepostSource(currentSource)
+        }
 
         binding.etSource.setText(currentSource)
         binding.tvCount.text = "${currentSource.length}/200"
@@ -86,7 +95,7 @@ class AuthorStatementBottomSheetDialogFragment : BottomSheetDialogFragment() {
     private fun setupButtons() {
         binding.tvConfirm.setOnClickListener {
             val currentType = viewModel.statementType.value ?: ReleaseVideoViewModel.StatementType.ORIGINAL
-            val currentSource = viewModel.repostSource.value ?: ""
+            val currentSource = UserInfoText.normalize(viewModel.repostSource.value)
 
             if (currentType == ReleaseVideoViewModel.StatementType.REPOST && currentSource.isBlank()) {
                 // 转载说明不得为空
